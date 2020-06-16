@@ -1,0 +1,113 @@
+FIL:linuxch2.txt
+TYP:single
+QST:A calendar for the current month can be shown on the command line by issuing which command?
+ANS:date
+ANS:id
+ANS:w
+ANS:cal
+COR:cal
+TYP:single
+QST:After a shell is no longer needed, what command can be given to exit the shell?
+ANS:exit
+ANS:stop
+ANS:reset
+ANS:quit
+COR:exit
+TYP:single
+QST:After logging into a terminal, a user will receive an interface known as which option?
+ANS:Shell
+ANS:Swap Memory
+ANS:Processor
+ANS:User interface
+COR:Shell
+TYP:single
+QST:Daniel knows there is an option that can be used to display the kernel version. How can he find out which option to use?
+ANS:ver --help
+ANS:man uname
+ANS:help version
+ANS:lsproc -?
+COR:man uname
+TYP:single
+QST:Which of the following file formats is Sandra likely to find available for download in order to allow her to use as the source for booting and installing Linux as a VM?
+ANS:.iso
+ANS:.tar.gz
+ANS:.zip
+ANS:.tgz
+COR:.iso
+TYP:single
+QST:Which utility will start and perform a thorough check of RAM for hardware errors when run?
+ANS:fsck
+ANS:memcheck68
+ANS:memtest86
+ANS:fixram
+COR:memtest86
+TYP:single
+QST:The Linux kernel exists as a file named:
+ANS:vmlinuz
+ANS:vmlinux
+ANS:kernel.0
+ANS:krn.linux
+COR:vmlinuz
+TYP:single
+QST:The apropos list command produces the same results as which command below?
+ANS:man -k list
+ANS:man -l list
+ANS:man -j list
+ANS:man -m list
+COR:man -k list
+TYP:single
+QST:Under the root directory in Linux, which directory contains system commands and utilities?
+ANS:/opt
+ANS:/usr
+ANS:/boot
+ANS:/var
+COR:/usr
+TYP:multi
+QST:Wayne is using the command line and is in his home directory. Which of the following will display a list of all files and their sizes from his home directory?
+ANS:ls -ax
+ANS:ls -ax ~
+ANS:ls -al /home/wayne
+ANS:ls -al ~
+COR:ls -al /home/waynels -al ~
+TYP:single
+QST:What directory under / contains the log files and spools for a Linux system?
+ANS:/usr
+ANS:/boot
+ANS:/var
+ANS:/opt
+COR:/var
+TYP:single
+QST:What metacharacter can be used to issue two commands to be run in consecutive order, without piping or redirecting output?
+ANS: \
+ANS: ;
+ANS: |
+ANS: &
+COR: ;
+TYP:single
+QST:What metacharacter indicates background command execution?
+ANS: @
+ANS: !
+ANS: &
+ANS: ^
+COR: &
+TYP:single
+QST:When using a command-line terminal, specific letters that start with a dash ("-") and appear after command names are considered to be:
+ANS:Options
+ANS:Arguments
+ANS:Keywords
+ANS:Metacharacters
+COR:Options
+TYP:single
+QST:Which Linux command can be utilized to display your current login name?
+ANS:who
+ANS:id
+ANS:whoami
+ANS:w
+COR:whoami
+TYP:single
+QST:Which of the following are true of the echo command?
+ANS:Including a semicolon at end of line will not affect text display
+ANS:Quotation marks to display text are optional
+ANS:All options are true
+ANS:A $ symbol can display shell variables
+COR:All options are true
