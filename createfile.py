@@ -32,9 +32,9 @@ class CreateFile:
     def get_answer_info(self):
 
         # Create a pop-up window to hold info boxes
-        self.__ans_info_window = tk.Toplevel(self.__create_window)
-        __ans_info_win_height = 200
-        __ans_info_win_width = 300
+        self.__ans_info_window = tk.Toplevel(master = self.__create_window)
+        __ans_info_win_height = 150
+        __ans_info_win_width = 500
         __x_pos = int((self.__screen_width / 2) - (__ans_info_win_width / 2))
         __y_pos = int((self.__screen_height / 2) - (__ans_info_win_height / 2))
         self.__ans_info_window.geometry(f'{__ans_info_win_width}x{__ans_info_win_height}+{__x_pos}+{__y_pos}')
@@ -52,13 +52,13 @@ class CreateFile:
                                             font = ('times', 14))
 
         # Create the radio buttons for single or multiple correct answers
-        self.__radio_var = tk.IntVar(self.__ans_info_win)
-        self.__rb1 = tk.Radiobutton(self.__ans_info_win,
+        self.__radio_var = tk.IntVar(self.__ans_info_window)
+        self.__rb1 = tk.Radiobutton(self.__ans_info_window,
                                     text = 'One correct answer',
                                     variable = self.__radio_var,
                                     value = 1,
                                     font = ('times', 12))
-        self.__rb2 = tk.Radiobutton(self.__ans_info_win,
+        self.__rb2 = tk.Radiobutton(self.__ans_info_window,
                                     text = 'Two+ correct answers',
                                     variable = self.__radio_var,
                                     value = 2,
@@ -82,13 +82,14 @@ class CreateFile:
             self.__answer_count = int(self.__ans_count_entry.get())
             self.__question_type = self.__radio_var.get()
 
-            if (self.__question_type != 1) or (self.__question_type != 2):
-                tk.messagebox.showerror('ERROR', 'Please select the number of answers.')
+            if (self.__question_type != 1):
+                if (self.__question_type != 2):
+                    tk.messagebox.showerror('ERROR', 'Please select the number of answers.')
             elif (self.__answer_count < 1):
                 tk.messagebox.showerror('ERROR', 'Number of answers can\'t be less than one.')
             else:
                 # Destroy the answer info window, then load the widgets into the create file window
-                self.__ans_info_win.destroy()
+                self.__ans_info_window.destroy()
                 self.create_widgets()
         except:
             tk.messagebox.showerror('ERROR',
