@@ -1,0 +1,71 @@
+FIL:linuxch11_2.txt
+TYP:single
+QST:Which of the following commands can be used to modify configuration options for DPM packages after they have been installed?
+ANS:dpkg-configure
+ANS:dpkg-update
+ANS:dpkg-reconfigure
+ANS:dpkg-config
+COR:2
+TYP:single
+QST:When using the compress command to archive a set of files into a single file, which of the following options will display the compression ratio of the individual files making up the new compressed file?
+ANS:-v
+ANS:-a
+ANS:-c
+ANS:-s
+COR:0
+TYP:single
+QST:Which of the following options for the tar command will create an archive that is also gzipped while displaying all of the work in progress to the terminal screen?
+ANS:tar -czvf
+ANS:tar -nzaf
+ANS:tar -cfza
+ANS:tar -ngac
+COR:0
+TYP:single
+QST:Which of the following package managers are used to install RPM packages on the SUSE or openSUSE distributions by default?
+ANS:APT
+ANS:DNF
+ANS:Zypper
+ANS:DPM
+COR:2
+TYP:single
+QST:Which of the following file extensions are used by the Debian Package Manager?
+ANS:.dpm
+ANS:.dpkg
+ANS:.deb
+ANS:.d
+COR:2
+TYP:single
+QST:Which of the following commands will list missing libraries as not found if a necessary library is not installed?
+ANS:ldso
+ANS:ldchk
+ANS:ldd
+ANS:ldconfig
+COR:2
+TYP:single
+QST:Which of the following commands can be used to back up files in case of system failure, supports long filenames, and can also back up device files?
+ANS:cpio
+ANS:bkup
+ANS:diskdup
+ANS:sysbackup
+COR:0
+TYP:single
+QST:Which of the following is the full path and file name where the Debian Package Manager repositories can be configured?
+ANS:/etc/dpm.conf
+ANS:/etc/apt.source.conf
+ANS:/etc/apt/sources.list
+ANS:/etc/dpm/repositories.conf
+COR:2
+TYP:single
+QST:Which of the following RPM options will update a software package to the newest version, or install the package if it does not already exist on a system?
+ANS:-U
+ANS:-F
+ANS:-i
+ANS:-u
+COR:0
+TYP:single
+QST:Which of the following is a tool that can be used to search Internet software repositories for RPM packages that map to your system's architecture, and automatically install or upgrade those packages on your system?
+ANS:tar
+ANS:wget
+ANS:YUM
+ANS:APT
+COR:2
