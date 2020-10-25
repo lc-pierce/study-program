@@ -1,0 +1,73 @@
+FIL:cisco_ch10.txt
+TYP:single
+QST:A router boots and enters setup mode. What is the reason for this?
+ANS:The IOS image is corrupt
+ANS:Cisco IOS is missing from flash memory
+ANS:The configuration file is missing from NVRAM@
+ANS:The POST process has detected hardware failure
+TYP:single
+QST:Which command is used to encrypt all passwords in a router configuration file?
+ANS:enable secret <password>
+ANS:service password-encryption@
+ANS:enable password <password>
+ANS:encrypt password
+TYP:single
+QST:Company policy requires using the most secure method to safeguard access to the privileged exec and configuration mode on the routers. The privileged exec password is trustknow1. Which of the following router commands achieves the goal of providing the highest level of security?
+ANS:secret password trustknow1
+ANS:enable password trustknow1
+ANS:service password-encryption
+ANS:enable secret trustknow1@
+TYP:single
+QST:An administrator is configuring a new router to permit out-of-band management access. Which set of commands will allow the required login using a password of cisco?
+ANS:line vty 0 4 / password manage / exit / enable password cisco
+ANS:line vty o 4 / password cisco / login
+ANS:line console 0 / password cisco / login@
+ANS:line console 0 / password cisco / exit / service password-encryption
+TYP:single
+QST:Which command can be used on a Cisco router to display all interfaces, the IPv4 address assigned, and the current status?
+ANS:show ip interface brief@
+ANS:ping
+ANS:show ip route
+ANS:show interface fa0/1
+TYP:single
+QST:Which CLI mode allows users to access all device commands, such as those used for configuration, management, and troubleshooting?
+ANS:user EXEC mode
+ANS:privileged EXEC mode@
+ANS:global configuration mode
+ANS:interface configuration mode
+TYP:single
+QST:What is the purpose of the startup configuration file on a Cisco router?
+ANS:to facilitate the basic operation of the hardware components of a device
+ANS:to contain the commands that are used to initially configure a router on startup@
+ANS:to contain the configuration commands that the router IOS is currently using
+ANS:to provide a limited backup version of the IOS, in case the router cannot load the full featured IOS
+TYP:single
+QST:Which characteristic describes the default gateway of a host computer?
+ANS:the logical address of the router interface on the same network as the host computer@
+ANS:the physical address of the switch interface connected to the host computer
+ANS:the physical address of the router interface on the same network as the host computer
+ANS:the logical address assigned to the switch interface connected to the router
+TYP:single
+QST:What is the purpose of the banner motd command?
+ANS:It configures a message that will identify printed documents to LAN users
+ANS:It is a way that routers communicate the status of their links with one another
+ANS:It provides an easy way of communicating with any user attached to a router's LANs
+ANS:It provides a way to make announcements to those who log in to a router@
+TYP:single
+QST:A technician is configuring a router to allow for all forms of management access. As part of each different type of access, the technician is trying to type the command login. Which configuration mode should be entered to do this task?
+ANS:user executive mode
+ANS:global configuration mode
+ANS:any line configuration mode@
+ANS:privileged EXEC mode
+TYP:single
+QST:What is stored in the NVRAM of a Cisco router?
+ANS:the Cisco IOS
+ANS:the running configuration
+ANS:the bootup instructions
+ANS:the startup configuration@
+TYP:single
+QST:Which statement regarding the service password-encryption command is true?
+ANS:It is configured in privileged EXEC mode
+ANS:It encrypts only line mode passwords
+ANS:All currently set passwords formerly displayed in plain text are encrypted@
+ANS:You can use the command "no service password-encryption" to view encrypted passwords in plain text

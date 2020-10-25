@@ -1,11 +1,3 @@
-# ------------------------------------------------------------------------------------------------- #
-# takequiz.py is used to create a new window that will allow the user to take a quiz over the files #
-#   they've loaded.                                                                                 #
-#                                                                                                   #
-# Author: Logan Pierceall                                                                           #
-# Last revision date: August 10, 2020                                                               #
-# ------------------------------------------------------------------------------------------------- #
-
 import os
 import tkinter as tk
 from tkinter import messagebox
@@ -20,37 +12,50 @@ class Quiz:
         self.__total_questions = self.__quiz_list.get_length()
         self.__answered_questions = 0
         self.__correct_answers = 0
-        self.__incorrect_list = []
         
-        self.__quiz_window = tk.Toplevel(master = root_window)
-        self.__quiz_win_height = 600
-        self.__quiz_win_width = 700
-        self.__y_pos = int((screen_height / 2) - (self.__quiz_win_height / 2))
-        self.__x_pos = int((screen_width / 2) - (self.__quiz_win_width / 2))
-        self.__quiz_window.geometry(f'{self.__quiz_win_width}x{self.__quiz_win_height}+{self.__x_pos}+{self.__y_pos}')
-
+        self.__bg_color = 'PaleTurquoise2'
+        self.__font_color = 'grey1'
+        self.__font = 'georgia'
+        self.__green = 'SpringGreen3'
+        self.__red = 'firebrick1'
+        self.__correct_color = 'SlateBlue1'
+        
+        # Used to offset the window creation by accounting for the presence of the desktop's taskbar
+        self.__taskbar_size = 40
+        
+        self.create_window(root_window, screen_width, screen_height)
         self.create_frames()
-
-
-
+        
+        
+    
+    def create_window (self, main_win, width, height):
+    
+        self.__quiz_window = tk.Toplevel(master = main_win)
+        self.__quiz_win_height = 700
+        self.__quiz_win_width = 800
+        self.__y_pos = int((height / 2) - (self.__quiz_win_height / 2) - self.__taskbar_size)
+        self.__x_pos = int((width / 2) - (self.__quiz_win_width / 2))
+        self.__quiz_window.geometry(f'{self.__quiz_win_width}x{self.__quiz_win_height}+{self.__x_pos}+{self.__y_pos}')
+    
+    
+    
     def create_frames (self):
     
         self.__current_qb = self.__quiz_list.get_quiz_entry()
-        
-        self.__quiz_window.title('Question source: ' + self.__current_qb.get_entry('Filename'))
+        self.__quiz_window.title('Question source: ' + self.__current_qb.get_filename())
         
         self.__question_frame = tk.Frame(self.__quiz_window,
                                          padx = 5,
                                          pady = 5,
-                                         bg = 'dodger blue')
+                                         bg = self.__bg_color)
         self.__answers_frame = tk.Frame(self.__quiz_window,
                                         padx = 5,
                                         pady = 5,
-                                        bg = 'dodger blue')
+                                        bg = self.__bg_color)
         self.__buttons_frame = tk.Frame(self.__quiz_window,
                                         padx = 5,
                                         pady = 5,
-                                        bg = 'dodger blue')
+                                        bg = self.__bg_color)
         self.__check_next_button_frame = tk.Frame(self.__buttons_frame)
         self.__exit_button_frame = tk.Frame(self.__buttons_frame)
         
@@ -60,178 +65,246 @@ class Quiz:
         self.__check_next_button_frame.pack(side = 'top', fill = 'both', expand = 'true')
         self.__exit_button_frame.pack(side = 'bottom', fill = 'both', expand = 'true')
         
+        # Create the objects that populate the rest of the window
         self.create_question_widgets()
-        self.create_answer_widgets(self.__current_qb.get_entry('QuestionType'))
+        if self.__current_qb.get_question_type() == 's':
+            # Current question is single answer, call single answer function to create answer widgets
+            self.create_single_answer()
+        elif self.__current_qb.get_question_type() == 'm':
+            # Create multi answer widgets
+            self.create_multi_answer()
         self.create_button_widgets()
-
-
-
+    
+    
+    
+    # Creates the objects that hold the question for the current qb object
     def create_question_widgets (self):
     
         self.__question_number_label = tk.Label(self.__question_frame,
                                                 text = 'QUESTION ' + str(self.__answered_questions + 1) 
                                                        + ' OF ' + str(self.__total_questions),
                                                 pady = 5,
-                                                font = ('times', 12, 'bold'),
-                                                bg = 'dodger blue',
-                                                fg = 'mint cream')
+                                                font = (self.__font, 12, 'bold'),
+                                                bg = self.__bg_color,
+                                                fg = self.__font_color)
         self.__question_label = tk.Label(self.__question_frame,
-                                         text = self.__current_qb.get_entry('Question'),
-                                         wraplength = 650,
+                                         text = self.__current_qb.get_question(),
+                                         wraplength = 775,
                                          justify = 'left',
-                                         font = ('times', 14, 'bold'),
-                                         bg = 'dodger blue',
-                                         fg = 'mint cream')
+                                         font = (self.__font, 14, 'bold'),
+                                         bg = self.__bg_color,
+                                         fg = self.__font_color)
         self.__question_result_label = tk.Label(self.__question_frame,
-                                                text = 'PLACEHOLDER',
-                                                font = ('times', 14, 'bold'),
+                                                text = 'NULL',
+                                                font = (self.__font, 14, 'bold'),
                                                 height = 1,
-                                                bg = 'dodger blue',
-                                                fg = 'dodger blue')
+                                                bg = self.__bg_color,
+                                                fg = self.__bg_color)
         self.__question_number_label.pack(side = 'top', fill = 'x')
         self.__question_label.pack(side = 'top', fill = 'both', expand = 'true')
         self.__question_result_label.pack(side = 'bottom', fill = 'x')
-
-
-
-    def create_answer_widgets (self, question_type):
     
+    
+    
+    # Creates the check button objects for a question with multiple answers
+    def create_multi_answer (self):
+    
+        # List will hold the answer button objects to help process the user's chosen answer
+        self.__answer_buttons_list = []
+    
+        self.__cb_vars_list = []
+        self.__answers_index = 0
+        
+        while self.__answers_index < self.__current_qb.get_answer_count():
+        
+            self.__cb_var = tk.IntVar(self.__quiz_window)
+            self.__cb_var.set(0)
+            self.__cb_vars_list.append(self.__cb_var)
+            
+            # Check if the answer is a correct one so it can be added to the correct answers
+            #   list and the special ending character can be stripped
+            __answer_text = self.__current_qb.get_answer()
+            if __answer_text[-1] == '@':
+                self.__current_qb.set_correct_answer(self.__answers_index)
+                __answer_text = __answer_text.strip('@')
+            
+            # Create the check button object for the answer
+            self.__cb = tk.Checkbutton(self.__answers_frame,
+                                           text = __answer_text,
+                                           variable = self.__cb_var,
+                                           font = (self.__font, 14, 'bold'),
+                                           wraplength = 600,
+                                           justify = 'left',
+                                           anchor = 'w',
+                                           bg = self.__bg_color,
+                                           activebackground = self.__bg_color,
+                                           fg = self.__font_color,
+                                           activeforeground = self.__font_color,
+                                           selectcolor = 'ghost white')
+            self.__cb.pack(fill = 'both', expand = 'true')
+            self.__answer_buttons_list.append(self.__cb)
+            
+            self.__answers_index += 1
+    
+    
+    
+    # Creates the radio button objects for a question with a single answer
+    def create_single_answer (self):
+    
+        # List will hold the answer button objects to help process the user's chosen answer
         self.__answer_buttons_list = []
         
-        if question_type == 'multi':
+        self.__radio_var = tk.IntVar(self.__quiz_window)
+        self.__radio_var.set(-1)
+        self.__answers_index = 0
         
-            self.__cb_vars_list = []
-            self.__answers_index = 0
-            while self.__answers_index < self.__current_qb.get_answer_count():
+        while self.__answers_index < self.__current_qb.get_answer_count():
+        
+            # Check if the answer is a correct one so it can be added to the correct answers
+            #   list and the special ending character can be stripped
+            __answer_text = self.__current_qb.get_answer()
+            if __answer_text[-1] == '@':
+                self.__current_qb.set_correct_answer(self.__answers_index)
+                __answer_text = __answer_text.strip('@')
             
-                self.__cb_var = tk.IntVar(self.__quiz_window)
-                self.__cb_var.set(0)
-                self.__cb_vars_list.append(self.__cb_var)
-                
-                self.__cb = tk.Checkbutton(self.__answers_frame,
-                                           text = self.__current_qb.get_entry('Answer' + 
-                                                  str(self.__answers_index)),
-                                           variable = self.__cb_var,
-                                           font = ('times', 14, 'bold'),
-                                           wraplength = 600,
-                                           justify = 'left',
-                                           anchor = 'w',
-                                           bg = 'dodger blue',
-                                           activebackground = 'dodger blue',
-                                           fg = 'mint cream',
-                                           activeforeground = 'mint cream',
-                                           selectcolor = 'black')
-                self.__cb.pack(fill = 'both', expand = 'true')
-                self.__answer_buttons_list.append(self.__cb)
-                
-                self.__answers_index += 1
-                
-        elif question_type == 'single':
-            self.__radio_var = tk.IntVar(self.__quiz_window)
-            self.__radio_var.set(-1)
-            self.__answers_index = 0
-            
-            while self.__answers_index < self.__current_qb.get_answer_count():
-            
-                self.__rb = tk.Radiobutton(self.__answers_frame,
-                                           text = self.__current_qb.get_entry('Answer' + 
-                                                  str(self.__answers_index)), 
+            # Create the radio button object for the answer
+            self.__rb = tk.Radiobutton(self.__answers_frame,
+                                           text = __answer_text, 
                                            variable = self.__radio_var,
                                            value = self.__answers_index,
-                                           font = ('times', 14, 'bold'),
+                                           font = (self.__font, 14, 'bold'),
                                            wraplength = 600,
                                            justify = 'left',
                                            anchor = 'w',
-                                           bg = 'dodger blue',
-                                           activebackground = 'dodger blue',
-                                           fg = 'mint cream',
-                                           activeforeground = 'mint cream',
-                                           selectcolor = 'black')
-                self.__rb.pack(fill = 'both', expand = 'true')
-                self.__answer_buttons_list.append(self.__rb)
+                                           bg = self.__bg_color,
+                                           activebackground = self.__bg_color,
+                                           fg = self.__font_color,
+                                           activeforeground = self.__font_color,
+                                           selectcolor = 'ghost white')
+            self.__rb.pack(fill = 'both', expand = 'true')
+            self.__answer_buttons_list.append(self.__rb)
                 
-                self.__answers_index += 1
-
-
-
+            self.__answers_index += 1
+    
+    
+    
+    # Creates the action button widgets
     def create_button_widgets (self):
     
         self.__check_answer_button = tk.Button(self.__check_next_button_frame,
                                                text = 'CHECK ANSWER',
                                                command = self.check_answer,
-                                               font = ('times', 16, 'bold'),
+                                               font = (self.__font, 16, 'bold'),
                                                bd = 0,
-                                               bg = 'dodger blue',
-                                               activebackground = 'dodger blue',
-                                               activeforeground = 'mint cream',
-                                               fg = 'mint cream')
+                                               bg = self.__bg_color,
+                                               activebackground = self.__bg_color,
+                                               activeforeground = self.__font_color,
+                                               fg = self.__font_color)
         self.__next_question_button = tk.Button(self.__check_next_button_frame,
                                                 text = 'NEXT QUESTION',
                                                 command = self.load_next_question,
-                                                font = ('times', 16, 'bold'),
+                                                font = (self.__font, 16, 'bold'),
                                                 bd = 0,
-                                                bg = 'dodger blue',
-                                                activebackground = 'dodger blue',
-                                                fg = 'mint cream',
-                                                activeforeground = 'mint cream',
+                                                bg = self.__bg_color,
+                                                activebackground = self.__bg_color,
+                                                fg = self.__font_color,
+                                                activeforeground = self.__font_color,
                                                 disabledforeground ='grey25')
         self.__next_question_button['state'] = 'disabled'
         self.__exit_button = tk.Button(self.__exit_button_frame,
                                        text = 'GRADE & EXIT QUIZ',
                                        command = self.grade_quiz,
-                                       font = ('times', 16, 'bold'),
-                                       bg = 'dodger blue',
-                                       activebackground = 'dodger blue',
-                                       fg = 'mint cream',
-                                       activeforeground = 'mint cream',
+                                       font = (self.__font, 16, 'bold'),
+                                       bg = self.__bg_color,
+                                       activebackground = self.__bg_color,
+                                       fg = self.__font_color,
+                                       activeforeground = self.__font_color,
                                        bd = 0)
         self.__check_answer_button.pack(side = 'left', fill = 'both', expand = 'true')
         self.__next_question_button.pack(side = 'right', fill = 'both', expand = 'true')
         self.__exit_button.pack(fill = 'both', expand = 'true')
-
-
-
+    
+    
+    
+    # Checks the question type and loads the correct check answer function before updating objects
+    #   to reflect the result
     def check_answer (self):
     
         self.__answered_questions += 1
         self.__check_answer_button['state'] = 'disabled'
-        self.__user_answer = []
-
-        if (self.__current_qb.get_entry('QuestionType')) == 'single':
-            self.__user_answer.append(self.__radio_var.get())   
-        elif (self.__current_qb.get_entry('QuestionType')) == 'multi':
-            __cb_index = 0
-            for __entry in self.__cb_vars_list:
-                if __entry.get() == 1:
-                    self.__user_answer.append(__cb_index)
-                __cb_index += 1
         
-        if self.__current_qb.check_answer(self.__user_answer):
-            self.__correct_answers += 1
-            self.__question_result_label.config(text = 'CORRECT', fg = 'mint cream')
-            for __index in self.__user_answer:
-                self.__answer_buttons_list[__index].config(bg = 'SpringGreen3')
-        else:
-            self.__question_result_label.config(text = 'INCORRECT', fg = 'mint cream')
-            for __index in self.__user_answer:
-                self.__answer_buttons_list[__index].config(bg = 'firebrick1')
-            for __index in self.__current_qb.get_entry('CorrectAnswer'):
-                self.__answer_buttons_list[__index].config(bg = 'SpringGreen3')
-
-        if self.__quiz_list.get_length():
+        if self.__current_qb.get_question_type() == 's':
+            self.check_single_answer()
+        elif self.__current_qb.get_question_type() == 'm':
+            self.check_multi_answer()
+        
+        # Check if there are any questions remaining and if so activate the button to continue.
+        #   Otherwise inform the user and hide the processing widgets
+        if self.__quiz_list.get_length() > 0:
             self.__next_question_button['state'] = 'active'
         else:
             self.__check_next_button_frame.forget()
-            self.__exit_button_frame
             self.__quiz_over_label = tk.Label(self.__buttons_frame,
-                                              text = "Quiz over! Click 'Grade & Exit Quiz' to get your results.",
-                                              font = ('times', 20, 'bold'),
-                                              bg = 'dodger blue',
-                                              fg = 'mint cream')
-            self.__quiz_over_label.pack(fill = 'both', expand = 'true')
-
-
-
+                                              text = "Quiz over! Click 'Grade & Exit Quiz'\nto get your results.",
+                                              font = (self.__font, 20, 'bold'),
+                                              bg = self.__bg_color,
+                                              fg = self.__font_color)
+            self.__quiz_over_label.pack(side = 'top', fill = 'both', expand = 'true')
+    
+    
+    
+    def check_single_answer (self):
+    
+        __user_answer = self.__radio_var.get()
+        if __user_answer == self.__current_qb.get_correct_answer():
+        
+            self.__correct_answers += 1
+            
+            # Update the label with the results and color the chosen answer box green
+            self.__question_result_label.config(text = 'CORRECT!',
+                                                fg = self.__correct_color)
+            self.__answer_buttons_list[__user_answer].config(bg = self.__green)
+        else:
+        
+            # Update the label with the results, color the chosen answer box red, and color the
+            #   correct option green
+            self.__question_result_label.config(text = 'INCORRECT',
+                                                fg = self.__correct_color)
+            self.__answer_buttons_list[__user_answer].config(bg = self.__red)
+            self.__answer_buttons_list[self.__current_qb.get_correct_answer()].config(bg = self.__green)
+    
+    
+    
+    def check_multi_answer (self):
+    
+        __index = 0
+        __user_answer = ''
+        for __entry in self.__cb_vars_list:
+            if __entry.get() == 1:
+                __user_answer += str(__index)
+            __index += 1
+        
+        if __user_answer == self.__current_qb.get_correct_answer():
+        
+            self.__correct_answers += 1
+            
+            # Update the label with the results and color the chosen answer boxes green
+            self.__question_result_label.config(text = 'CORRECT!',
+                                                fg = self.__correct_color)
+            for __char in __user_answer:
+                self.__answer_buttons_list[int(__char)].config(bg = self.__green)
+        else:
+        
+            self.__question_result_label.config(text = 'INCORRECT',
+                                                fg = self.__correct_color)
+            for __char in __user_answer:
+                self.__answer_buttons_list[int(__char)].config(bg = self.__red)
+                
+            for __char in self.__current_qb.get_correct_answer():
+                self.__answer_buttons_list[int(__char)].config(bg = self.__green)
+    
+    
+    
     def load_next_question (self):
     
         self.__question_frame.forget()
@@ -239,17 +312,18 @@ class Quiz:
         self.__buttons_frame.forget()
         
         self.create_frames()
-
-
-
+    
+    
+    
     def grade_quiz (self):
     
-        if not self.__answered_questions:
+        # If no questions were answered, skip grading. Otherwise calculate a score and show the user
+        if self.__answered_questions == 0:
             pass
         else:
             __student_score = self.__correct_answers / self.__answered_questions
             tk.messagebox.showinfo('Quiz over! Here are your results.',
                                    f'You answered {self.__correct_answers} out of {self.__answered_questions}'
                                    + f' questions correct for a score of {__student_score:.2%}!')
-
+        
         self.__quiz_window.destroy()
