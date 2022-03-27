@@ -17,6 +17,7 @@ TEXTBOX_SIZE = 1                # Default height/width for Text entry boxes
 WRAPLENGTH = 500                # Default max length for lines of text
 
 
+
 # CreateButton() creates and returns a tkinter Button widget
 # Args:     parent = widget's parent object
 #           text = text displayed on the button
@@ -27,6 +28,15 @@ def CreateButton(parent, text, command, font = FONT):
 
     return tk.Button(parent, text = text, command = command, font = font,
                      bg = BG_COLOR, width = 10)
+
+
+
+# CreateCanvas() creates and returns a tkinter Canvas widget
+# Args:     parent = widget's parent object
+# Returns:  a tkinter Canvas object
+def CreateCanvas(parent):
+
+    return tk.Canvas(parent, bg = BG_COLOR, highlightthickness = 0)
 
 
 
@@ -58,11 +68,12 @@ def CreateEntry(parent, text_var, font = FONT):
 
 # CreateFrame() creates and returns a tkinter Frame widget
 # Args:     parent = widget's parent object
-#           padx, pady = overloadable frame padding
+#           pad_x = overloadable horizontal padding
+#           pad_y = overloadable vertical padding
 # Returns:  a tkinter Frame object
-def CreateFrame(parent, padx = PAD, pady = PAD):
+def CreateFrame(parent, pad_x = PAD, pad_y = PAD):
 
-    return tk.Frame(parent, padx = padx, pady = pady, bg = BG_COLOR)
+    return tk.Frame(parent, padx = pad_x, pady = pad_y, bg = BG_COLOR)
 
 
 

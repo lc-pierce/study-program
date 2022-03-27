@@ -20,11 +20,10 @@ class CreateDBWindow(Tk):
         super().__init__(*args, **kwargs)
         
         self.WIN_HEIGHT = 600           # Window height
-        self.WIN_WIDTH = 1100           # Window width
+        self.WIN_WIDTH = 1300           # Window width
         self.ANS_PAD = 1                # Padding used for answer box frames
         self.ANS_TEXT_HEIGHT = 2        # Height used for answer entry boxes
         self.FONT = ('georgia', 12)     # Default font used by all widgets
-        self.ANS_LIMIT = 7              # Ceiling for number of answer options
         self.INITIAL_ANS_TEXT = 'Enter answer here...'  # Initial text inserted
                                                         #   into 'Answer' entry
                                                         #   boxes
@@ -48,16 +47,23 @@ class CreateDBWindow(Tk):
     
     
     # AddAnswer() calls CreateAnswerField() to add an additional label and
-    #   text entry box for an answer option. An upper limit to the amount
-    #   of answer options is given by self.ANS_LIMIT
+    #   text entry box for an answer option.
     # Args:     none
     # Returns:  none
     def AddAnswer(self, *args):
         
-        if self.ans_index < self.ANS_LIMIT:
-            self.CreateAnswerField(self.ans_frame)
-        else:
-            tk.messagebox.showerror('ERROR', 'Answer limit reached.')
+        self.CreateAnswerField(self.answidg_frame)
+    
+    
+    
+    # BindMouseWheel() is an event that triggers when the mouse hovers over the
+    #   answer widget frame. It calls MouseWheelScroll() to allow the mouse
+    #   wheel to scroll through the answer widget canvas
+    # Args:     event = the event that invokes the function
+    # Returns:  none
+    def BindMouseWheel(self, event):
+    
+        self.ans_canvas.bind_all('<MouseWheel>', self.MouseWheelScroll)
     
     
     
@@ -85,15 +91,15 @@ class CreateDBWindow(Tk):
     
         self.ans_index += 1
     
-        # Create a frame to hold the label and correct answer checkbox and a
-        #   frame to hold the text entry box
+        # Create a frame to hold the label and correct answer checkbox
         label_frame = WidgetCreation.CreateFrame(parent, self.ANS_PAD,
                                                  self.ANS_PAD)
-        label_frame.pack(fill = 'x')
+        label_frame.pack(fill = 'x', expand = 'true')
         
+        # Create a frame to hold the text entry box
         text_frame = WidgetCreation.CreateFrame(parent, self.ANS_PAD,
                                                 self.ANS_PAD)
-        text_frame.pack(fill = 'x')
+        text_frame.pack(fill = 'x', expand = 'true')
         
         # Create the numbered answer label
         label_str = 'Answer ' + str(self.ans_index)
@@ -158,7 +164,8 @@ class CreateDBWindow(Tk):
     
     # CreateFrames() initalizes the following widgets:
     #   A frame to hold the question entry field
-    #   A frame to hold the answer entry fields
+    #   A canvas and attached scrollbar that holds a frame that is used to
+    #       place the answer entry fields
     #   A frame to hold the window's buttons
     # It also calls the functions to initialize the question fields, the answer
     #   fields, and the button fields
@@ -181,27 +188,54 @@ class CreateDBWindow(Tk):
         self.question_frame.pack(side = 'left', fill = 'both', expand = 'true')
         self.question_frame.pack_propagate(0)
         
-        # Create the 'Answer' and button frames
-        self.answers_buttons_frame = WidgetCreation.CreateFrame(self)
-        self.answers_buttons_frame.pack(side = 'right', fill = 'both',
-                                        expand = 'true')
-        self.answers_buttons_frame.pack_propagate(0)
-        
-        self.ans_frame = WidgetCreation.CreateFrame(self.answers_buttons_frame)
-        self.ans_frame.pack(side = 'top', fill = 'both', expand = 'true')
-        
-        but_frame = WidgetCreation.CreateFrame(self.answers_buttons_frame)
+        # Create the buttons frame
+        but_frame = WidgetCreation.CreateFrame(self.question_frame)
         but_frame.pack(side = 'bottom', fill = 'x')
+        
+        # Create a frame for the answer canvas and widgets
+        self.answers_frame = WidgetCreation.CreateFrame(self)
+        self.answers_frame.pack(side = 'right', fill = 'both', expand = 'true')
+        self.answers_frame.pack_propagate(0)
+        
+        # Create a canvas to hold the answer entry widgets and a frame to place
+        #   those widgets on
+        self.ans_canvas = WidgetCreation.CreateCanvas(self.answers_frame)
+        self.ans_canvas.pack(fill = 'both', expand = 'true')
+        
+        self.answidg_frame = WidgetCreation.CreateFrame(self.ans_canvas)
+        self.answidg_frame.pack(fill = 'both', expand = 'true')
+        
+        self.ans_canvas.create_window((0, 0), window = self.answidg_frame,
+                                      anchor = 'nw', width = 620)
+        
+        # Create a scrollbar to use when the answer widgets grow beyond the
+        #   height of the window
+        scrollbar = tk.Scrollbar(self.ans_canvas, orient = 'vertical',
+                                 command = self.ans_canvas.yview)
+        self.ans_canvas.configure(yscrollcommand = scrollbar.set,
+                                  scrollregion = self.ans_canvas.bbox('all'))
+        scrollbar.pack(side = 'right', fill = 'y')
+        
+        # Bind the <Configure> event on the frame to update the scroll region
+        #   of the canvas every time a new answer field is added
+        self.answidg_frame.bind('<Configure>', self.FrameConfigure)
+        
+        # Bind the scrollbar to the mousewheel, but only when the mouse is
+        #   hovering over the answer widget fields
+        self.answidg_frame.bind('<Enter>', self.BindMouseWheel)
+        self.answidg_frame.bind('<Leave>', self.UnbindMouseWheel)
         
         # Create the 'Question' fields
         self.CreateQuestionFields(self.question_frame)
         
         # Create the 4 initial 'Answer' fields
-        while self.ans_index < 4:
-            self.CreateAnswerField(self.ans_frame)
+        self.CreateAnswerField(self.answidg_frame)
+        self.CreateAnswerField(self.answidg_frame)
+        self.CreateAnswerField(self.answidg_frame)
+        self.CreateAnswerField(self.answidg_frame)
             
         # Create the button fields
-        self.CreateButtonFields(self.answers_buttons_frame)
+        self.CreateButtonFields(but_frame)
     
     
     
@@ -251,6 +285,28 @@ class CreateDBWindow(Tk):
     def FocusNextWidget(self, event):
     
         event.widget.tk_focusNext().focus()
+    
+    
+    
+    # FrameConfigure() is an event that re-calculates the scroll region of
+    #   the answers canvas CreateAnswerField() is called. This allows the
+    #   scrollbar to reach new answer fields as they exceed the height of the
+    #   window.
+    # Args:     event = the event that invokes the function
+    # Returns:  none
+    def FrameConfigure(self, event):
+    
+        self.ans_canvas.configure(scrollregion = self.ans_canvas.bbox('all'))
+    
+    
+    
+    # MouseWheelScroll() allows the mouse wheel to scroll through the answer
+    #   widgets field once it grows beyond the height of the window
+    # Args:     event = the event that invokes the function
+    # Returns:  none
+    def MouseWheelScroll(self, event):
+    
+        self.ans_canvas.yview_scroll(int(-1 * (event.delta / 120)), 'units')
     
     
     
@@ -349,3 +405,14 @@ class CreateDBWindow(Tk):
                 self.destroy()
             else:
                 tk.messagebox.showerror('ERROR', msg)
+    
+    
+    
+    # UnbindMouseWheel() is an event that triggers when the mouse moves away
+    #   from the answer widget frame. It unbinds the mouse wheel so that
+    #   scrolling won't scroll through the widgets
+    # Args:     event = the event that invokes the function
+    # Returns:  none
+    def UnbindMouseWheel(self, event):
+    
+        self.ans_canvas.unbind_all('<MouseWheel>')
