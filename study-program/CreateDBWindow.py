@@ -4,259 +4,226 @@
 # Date: March 14, 2022                                                        #
 #-----------------------------------------------------------------------------#
 
+import os
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import Tk
 
 import CreateDBLogic
-import WidgetCreation
+import MainLogic
+import Widgets
 
 
+class CreateDBWindow():
 
-class CreateDBWindow(Tk):
-
-    def __init__(self, user, *args, **kwargs):
+    def __init__(self, root_window, user, parent_listbox):
     
-        super().__init__(*args, **kwargs)
-        
-        self.WIN_HEIGHT = 600           # Window height
-        self.WIN_WIDTH = 1300           # Window width
-        self.ANS_PAD = 1                # Padding used for answer box frames
-        self.ANS_TEXT_HEIGHT = 2        # Height used for answer entry boxes
-        self.FONT = ('georgia', 12)     # Default font used by all widgets
-        self.INITIAL_ANS_TEXT = 'Enter answer here...'  # Initial text inserted
-                                                        #   into 'Answer' entry
-                                                        #   boxes
-                                                        
-        self.INITIAL_Q_TEXT = 'Enter question here...'  # Initial text inserted
-                                                        #   into the 'Question'
-                                                        #   entry box
-        
-        self.finish_flag = False        # Flag to ensure the final question
-                                        #   gets added to the file
-        
+        self.root         = root_window
         self.current_user = user
-        self.question_num = 0           # Tracks current question number for
-                                        #   display purposes
+        self.listbox      = parent_listbox
         
-        # Bind the 'Tab' keyboard button to move between Text entry objects
-        self.bind_class("Text", "<Tab>", self.FocusNextWidget)
+        # Window dimensions
+        self.WIN_HEIGHT = 600
+        self.WIN_WIDTH  = 1300
+        
+        # Widget option constants
+        self.BUT_HEIGHT       = 5
+        self.INITIAL_ANS_TEXT = 'Enter answer here'
+        self.INITIAL_Q_TEXT   = 'Enter question here...'
+        self.WHITE            = '#f8f8ff'
+        
+        # Initial text entry box contents constants
+        self.INITIAL_Q_TEXT   = 'Enter question here...'
+        self.INITIAL_ANS_TEXT = 'Enter answer here...'
+        
+        # Ensures final form gets added to the file
+        self.finish_flag = False
+
+        # Tracks current question number
+        self.question_num = 1
+        
+        # Tracks the number of answer text entry boxes
+        self.ans_index = 0
         
         self.CreateWindow()
     
     
     
-    # AddAnswer() calls CreateAnswerField() to add an additional label and
-    #   text entry box for an answer option.
+    # AddAnswerBox() initializes all of the widgets required for a single
+    #   answer entry option. This function is also called by the 'Add Answer
+    #   Box' button
     # Args:     none
     # Returns:  none
-    def AddAnswer(self, *args):
+    def AddAnswerBox(self):
+    
+        self.ans_index += 1
         
-        self.CreateAnswerField(self.answidg_frame)
+        # Create a frame to hold the label and correct answer checkbox
+        label_frame = Widgets.CreateFrame(self.answers_frame, 1, 1)
+        label_frame.pack(fill = 'x', expand = 'true')
+        
+        # Create the answer label
+        label_str = 'Answer ' + str(self.ans_index)
+        ans_label = Widgets.CreateLabel(label_frame, label_str)
+        ans_label.pack(side = 'left')
+        
+        # Create a checkbox to mark an answer as the correct option
+        cb_var = tk.IntVar(self.window)
+        self.cb_list.append(cb_var)
+        ans_cb = Widgets.CreateCheckButton(label_frame, 'Correct Answer', 
+                                           cb_var)
+        ans_cb.pack(side = 'left')
+        
+        # Create the text entry box
+        text_frame = Widgets.CreateFrame(self.answers_frame,
+                                      _padx = 1, _pady = 1)
+        text_frame.pack(fill = 'x', expand = 'true')
+        
+        ans_text = Widgets.CreateText(text_frame)
+        ans_text.insert('1.0', self.INITIAL_ANS_TEXT)
+        ans_text.pack()
+        self.ans_box_list.append(ans_text)
+        
+        # Create a binding to clear the initial text when the widget is
+        #   selected
+        ans_text.bind('<FocusIn>', self.ClearField)
+        
+        # Create a binding to re-insert the initial text if the widget
+        #   isn't populated after clearing the contents
+        ans_text.bind('<FocusOut>', self.RestoreAnswerField)
     
     
     
-    # BindMouseWheel() is an event that triggers when the mouse hovers over the
-    #   answer widget frame. It calls MouseWheelScroll() to allow the mouse
-    #   wheel to scroll through the answer widget canvas
-    # Args:     event = the event that invokes the function
+    # BindMouseWheel() allows the mouse wheel to scroll through the answers
+    #   canvas if the mouse is within the canvas field
+    # Args:     event = the invoking event
     # Returns:  none
     def BindMouseWheel(self, event):
     
-        self.ans_canvas.bind_all('<MouseWheel>', self.MouseWheelScroll)
+        # The scroll wheel has undesired behavior if the answer widget side
+        #   isn't yet fully populated
+        if self.ans_index > 7:
+            self.ans_canvas.bind_all('<MouseWheel>', self.MouseWheelScroll)
     
     
     
-    # ClearField() is an event method bound to <FocusIn> on the text entry
-    #   boxes used for the question and answer fields. It clears out the text
-    #   initially placed into the field when created if it is still present.
-    # Args:     event = the event that invokes the function
+    # ClearField() is an event bound to <FocusIn> on the question and answer
+    #   text entry boxes. This function clears out the text initially inserted
+    #   into the widget when created.
+    # Args:     event = the invoking event
     # Returns:  none
     def ClearField(self, event):
-        text = event.widget.get('1.0', 'end').rstrip()
-        if (text == self.INITIAL_Q_TEXT or text == self.INITIAL_ANS_TEXT):
+        contents = event.widget.get('1.0', 'end').rstrip()
+        if (contents == self.INITIAL_Q_TEXT or
+            contents == self.INITIAL_ANS_TEXT):
             event.widget.delete('1.0', 'end')
     
     
     
-    # CreateAnswerField() initializes the following widgets:
-    #   A frame to hold the label and checkbox
-    #   A frame to hold the text entry box
-    #   A label to indicate the answer option number
-    #   A checkbox to indicate the answer option is a correct answer
-    #   A text entry box to provide the answer option's content
-    # Args:     parent = the widget's parent object
-    # Returns:  none
-    def CreateAnswerField(self, parent):
-    
-        self.ans_index += 1
-    
-        # Create a frame to hold the label and correct answer checkbox
-        label_frame = WidgetCreation.CreateFrame(parent, self.ANS_PAD,
-                                                 self.ANS_PAD)
-        label_frame.pack(fill = 'x', expand = 'true')
-        
-        # Create a frame to hold the text entry box
-        text_frame = WidgetCreation.CreateFrame(parent, self.ANS_PAD,
-                                                self.ANS_PAD)
-        text_frame.pack(fill = 'x', expand = 'true')
-        
-        # Create the numbered answer label
-        label_str = 'Answer ' + str(self.ans_index)
-        ans_label = WidgetCreation.CreateLabel(label_frame, label_str,
-                                               self.FONT)
-        ans_label.pack(side = 'left')
-        
-        # Create a checkbox to mark an answer as the correct option
-        cb_var = tk.IntVar(self)
-        self.cb_list.append(cb_var)
-        ans_cb = WidgetCreation.CreateCheckButton(label_frame,
-                                                  'Correct Answer', cb_var,
-                                                  self.FONT)
-        ans_cb.pack(side = 'right')
-        
-        # Create the text entry box
-        ans_text = WidgetCreation.CreateText(text_frame, self.FONT,
-                                             self.ANS_TEXT_HEIGHT)
-        ans_text.insert('1.0', self.INITIAL_ANS_TEXT)
-        ans_text.pack(fill = 'x')
-        
-        # Bind the <FocusIn> event to remove the INITIAL_ANS_TEXT string
-        ans_text.bind('<FocusIn>', self.ClearField)
-        
-        # Bind the <FocusOut> event to restore the INITIAL_ANS_TET string
-        #   if no other text was entered into the field
-        ans_text.bind('<FocusOut>', self.RestoreAnswerField)
-        
-        # Store the box into a list for later retrieval
-        self.ans_box_list.append(ans_text)
-    
-    
-    
-    # CreateButtonFields() initializes the following widgets:
-    #   A button to add an additional answer field
-    #   A button to save the current data and load a fresh screen
-    #   A button to save the current data and record all the data to a file
-    # Args:     parent = the widget's parent object
-    # Returns:  none
-    def CreateButtonFields(self, parent):
-    
-        # Create a button that calls AddAnswer() to add an additional set of
-        #   answer entry fields
-        add_ans_button = WidgetCreation.CreateButton(parent,
-                                                     'Add answer box',
-                                                     self.AddAnswer)
-        add_ans_button.pack(side = 'left', fill = 'x', expand = 'true')
-        
-        # Create a button that calls NextQuestion() to save the currently
-        #   entered data and create a fresh screen
-        next_q_button = WidgetCreation.CreateButton(parent, 'Next question',
-                                                    self.NextQuestion)
-        next_q_button.pack(side = 'left', fill = 'x', expand = 'true')
-        
-        # Create a button that calls SerializeDB() to save the currently
-        #   entered data and write it to a file
-        finish_button = WidgetCreation.CreateButton(parent, 'Save & Finish',
-                                                    self.SerializeDB)
-        finish_button.pack(side = 'right', fill = 'x', expand = 'true')
-    
-    
-    
-    # CreateFrames() initalizes the following widgets:
-    #   A frame to hold the question entry field
-    #   A canvas and attached scrollbar that holds a frame that is used to
-    #       place the answer entry fields
-    #   A frame to hold the window's buttons
-    # It also calls the functions to initialize the question fields, the answer
-    #   fields, and the button fields
+    # CreateAnswers() initializes the scrollable canvas and frame that will
+    #   hold the answer entry widgets. This function also calls the
+    #   AddAnswerBox() function 4 times to create the initial answer widgets
     # Args:     none
     # Returns:  none
-    def CreateFrames(self):
+    def CreateAnswers(self):
     
-        self.question_num += 1
-        self.ans_box_list = []          # Stores all answer entry boxes so the
-                                        #   contents can be retrieved later
-        self.ans_index = 0              # Tracks answer option number for
-                                        #   display purposes
-        self.cb_list = []               # Stores all checkbuttons so their
-                                        #   contents can be retrieved later
-        
-        # Create the 'Question' label frame
-        q_str = 'Question ' + str(self.question_num)
-        self.question_frame = WidgetCreation.CreateLabelFrame(self, q_str,
-                                                              self.FONT)
-        self.question_frame.pack(side = 'left', fill = 'both', expand = 'true')
-        self.question_frame.pack_propagate(0)
-        
-        # Create the buttons frame
-        but_frame = WidgetCreation.CreateFrame(self.question_frame)
-        but_frame.pack(side = 'bottom', fill = 'x')
-        
-        # Create a frame for the answer canvas and widgets
-        self.answers_frame = WidgetCreation.CreateFrame(self)
-        self.answers_frame.pack(side = 'right', fill = 'both', expand = 'true')
-        self.answers_frame.pack_propagate(0)
-        
-        # Create a canvas to hold the answer entry widgets and a frame to place
-        #   those widgets on
-        self.ans_canvas = WidgetCreation.CreateCanvas(self.answers_frame)
+        # Create a canvas within the answers frame to place the widgets
+        self.ans_canvas = Widgets.CreateCanvas(self.a_frame, self.WHITE)
         self.ans_canvas.pack(fill = 'both', expand = 'true')
+    
+        # Place a frame for the widgets inside the answer canvas
+        self.answers_frame = Widgets.CreateFrame(self.ans_canvas)
+        self.answers_frame.pack(fill = 'both', expand = 'true')
+        self.ans_canvas.create_window(0, 0, anchor = 'nw', width = 620,
+                                      window = self.answers_frame)
         
-        self.answidg_frame = WidgetCreation.CreateFrame(self.ans_canvas)
-        self.answidg_frame.pack(fill = 'both', expand = 'true')
-        
-        self.ans_canvas.create_window((0, 0), window = self.answidg_frame,
-                                      anchor = 'nw', width = 620)
-        
-        # Create a scrollbar to use when the answer widgets grow beyond the
-        #   height of the window
-        scrollbar = tk.Scrollbar(self.ans_canvas, orient = 'vertical',
-                                 command = self.ans_canvas.yview)
+        # Create a scrollbar for the canvas
+        scrollbar = Widgets.CreateScrollbar(self.ans_canvas)
+        scrollbar.configure(command = self.ans_canvas.yview)
         self.ans_canvas.configure(yscrollcommand = scrollbar.set,
                                   scrollregion = self.ans_canvas.bbox('all'))
         scrollbar.pack(side = 'right', fill = 'y')
         
-        # Bind the <Configure> event on the frame to update the scroll region
-        #   of the canvas every time a new answer field is added
-        self.answidg_frame.bind('<Configure>', self.FrameConfigure)
+        # Bind the frame to update the scrollregion every time an answer is
+        #   added to the window
+        self.answers_frame.bind('<Configure>', self.FrameConfigure)
         
-        # Bind the scrollbar to the mousewheel, but only when the mouse is
-        #   hovering over the answer widget fields
-        self.answidg_frame.bind('<Enter>', self.BindMouseWheel)
-        self.answidg_frame.bind('<Leave>', self.UnbindMouseWheel)
+        # Bind the mouse wheel to scroll the scrollbar whenever the mouse is
+        #   within the canvas boundaries
+        self.answers_frame.bind('<Enter>', self.BindMouseWheel)
+        self.answers_frame.bind('<Leave>', self.UnbindMouseWheel)
         
-        # Create the 'Question' fields
-        self.CreateQuestionFields(self.question_frame)
+        # Initialize the list to hold checkbutton variables
+        self.cb_list = []
         
-        # Create the 4 initial 'Answer' fields
-        self.CreateAnswerField(self.answidg_frame)
-        self.CreateAnswerField(self.answidg_frame)
-        self.CreateAnswerField(self.answidg_frame)
-        self.CreateAnswerField(self.answidg_frame)
-            
-        # Create the button fields
-        self.CreateButtonFields(but_frame)
+        # Initialize the list to hold answer text entry boxes
+        self.ans_box_list = []
+        
+        # Create 4 initial answer fields
+        for i in range(4):
+            self.AddAnswerBox()
     
     
     
-    # CreateQuestionFields() initializes the following widgets:
-    #   A text entry box to enter the question content
-    # Args:     parent = the widget's parent object
+    # CreateButtons() initializes the main window buttons that allow the user
+    #   to add an additional answer entry box, save the current data and
+    #   refresh the screen, and finish up creation by saving the file
+    # Args:     none
     # Returns:  none
-    def CreateQuestionFields(self, parent):
+    def CreateButtons(self):
     
-        self.question_entry = WidgetCreation.CreateText(parent, self.FONT)
-        self.question_entry.pack(fill = 'both', expand = 'true')
+        # Create frames to hold the buttons
+        left_frame = Widgets.CreateFrame(self.b_frame)
+        left_frame.pack(side = 'left', fill = 'both', expand = 'true')
         
-        # Insert the initial entry box contents
-        self.question_entry.insert('1.0', self.INITIAL_Q_TEXT)
+        middle_frame = Widgets.CreateFrame(self.b_frame)
+        middle_frame.pack(side = 'left', fill = 'both', expand = 'true')
         
-        # Bind the <FocusIn> event to remove the INITIAL_Q_TET string
-        self.question_entry.bind('<FocusIn>', self.ClearField)
+        right_frame = Widgets.CreateFrame(self.b_frame)
+        right_frame.pack(side = 'left', fill = 'both', expand = 'true')
         
-        # Bind the <FocusOut> event to restore the INITIAL_Q_TET string
-        #   if no other text was entered into the field
-        self.question_entry.bind('<FocusOut>', self.RestoreQuestionField)
+        # Create a button to exit creation and save the file
+        finish_button = Widgets.CreateButton(left_frame, 'Save\n& Finish',
+                                             self.SerializeDB, self.BUT_HEIGHT)
+        finish_button.pack()
+        
+        # Create a button to save current data and refresh the screen
+        next_button = Widgets.CreateButton(middle_frame, 'Next\nQuestion',
+                                           self.NextQuestion, self.BUT_HEIGHT)
+        next_button.pack()
+        
+        # Create a button to add an additional answer box
+        add_answer_button = Widgets.CreateButton(right_frame,
+                                                 'Add\nAnswer Box',
+                                                 self.AddAnswerBox,
+                                                 self.BUT_HEIGHT)
+        add_answer_button.pack()
+    
+    
+    
+    # CreateQuestion() initializes a labelframe and text entry box to enter
+    #   the question contents.
+    # Args:     none
+    # Returns:  none
+    def CreateQuestion(self):
+    
+        # Create a labeled frame to hold the text entry box
+        q_str = 'Question ' + str(self.question_num)
+        self.question_lframe = Widgets.CreateLabelFrame(self.q_frame, q_str)
+        self.question_lframe.pack(fill = 'both', expand = 'true')
+        
+        # Create the text entry box and fill with placeholder text
+        self.question_text = Widgets.CreateText(self.question_lframe)
+        self.question_text.pack(fill = 'both', expand = 'true')
+        self.question_text.insert('1.0', self.INITIAL_Q_TEXT)
+        
+        # Create a binding to clear the initial text when the widget is
+        #   selected
+        self.question_text.bind('<FocusIn>', self.ClearField)
+        
+        # Create a binding to re-insert the initial text if the widget
+        #   isn't populated after clearing the contents
+        self.question_text.bind('<FocusOut>', self.RestoreQuestionField)
     
     
     
@@ -265,22 +232,64 @@ class CreateDBWindow(Tk):
     # Returns:  none
     def CreateWindow(self):
     
+        self.window = tk.Toplevel(self.root)
+    
         # Obtain x&y coordinates to place window in center of screen
-        y_pos = int((self.winfo_screenheight() / 2) - (self.WIN_HEIGHT / 2))
-        x_pos = int((self.winfo_screenwidth() / 2) - (self.WIN_WIDTH / 2))
+        y_pos = int((self.window.winfo_screenheight() / 2) -
+                    (self.WIN_HEIGHT / 2))
+        x_pos = int((self.window.winfo_screenwidth() / 2) - 
+                    (self.WIN_WIDTH / 2))
         
-        self.title(f'New database file for {self.current_user}')
-        self.geometry(f'{self.WIN_WIDTH}x{self.WIN_HEIGHT}+{x_pos}+{y_pos}')
-        self.resizable(False, False)
+        dimensions = f'{self.WIN_WIDTH}x{self.WIN_HEIGHT}+{x_pos}+{y_pos}'
+        self.window.geometry(dimensions)
+        self.window.title(f'New database file for {self.current_user}')
+        self.window.resizable(False, False)
         
-        # Create the window frames
-        self.CreateFrames()
+        # Bind the 'Tab' keyboard button to move between Text entry objects
+        self.window.bind_class("Text", "<Tab>", self.FocusNextWidget)
+        
+        # Create a main frame and canvas
+        self.main_frame = Widgets.CreateFrame(self.window)
+        self.main_frame.pack(fill = 'both', expand = 'true')
+        
+        self.main_canvas = Widgets.CreateCanvas(self.main_frame)
+        self.main_canvas.pack(fill = 'both', expand = 'true')
+        
+        # Create a rectangle, frame, and window for the question
+        self.main_canvas.create_rectangle(5, 5, 635, 480, fill = self.WHITE)
+        self.q_frame = Widgets.CreateFrame(self.main_canvas)
+        self.main_canvas.create_window(7, 7, anchor = 'nw',
+                                       height = 473, width = 628,
+                                       window = self.q_frame)
+        
+        # Create a rectangle, frame, and window for the action buttons
+        self.main_canvas.create_rectangle(5, 490, 635, 585, fill = self.WHITE)
+        self.b_frame = Widgets.CreateFrame(self.main_canvas)
+        self.main_canvas.create_window(7, 492, anchor = 'nw',
+                                       height = 93, width = 628,
+                                       window = self.b_frame)
+        
+        # Create a rectangle, frame, and window for the answers
+        self.main_canvas.create_rectangle(655, 5, 1285, 585, fill = self.WHITE)
+        self.a_frame = Widgets.CreateFrame(self.main_canvas)
+        self.main_canvas.create_window(657, 7, anchor = 'nw',
+                                       height = 578, width = 628,
+                                       window = self.a_frame)
+        
+        # Create the question widgets
+        self.CreateQuestion()
+        
+        # Create the button widgets
+        self.CreateButtons()
+        
+        # Create the answer widgets
+        self.CreateAnswers()
     
     
     
-    # FocusNextWidget() allows the 'Tab' keyboard button to shift focus between
-    #   widgets rather than insert space into an entry widget
-    # Args:     event = the event that invokes the function
+    # FocusNextWidget() allows the 'Tab' keyboard to shift focus between
+    #   widgets instead of inserting a tab into a text entry box
+    # Args:     event = the invoking event
     # Returns:  none
     def FocusNextWidget(self, event):
     
@@ -288,11 +297,9 @@ class CreateDBWindow(Tk):
     
     
     
-    # FrameConfigure() is an event that re-calculates the scroll region of
-    #   the answers canvas CreateAnswerField() is called. This allows the
-    #   scrollbar to reach new answer fields as they exceed the height of the
-    #   window.
-    # Args:     event = the event that invokes the function
+    # FrameConfigure() is an event that re-calculates the scroll region of the
+    #   canvas every time a new answer box is added
+    # Args:     event = the invoking event
     # Returns:  none
     def FrameConfigure(self, event):
     
@@ -300,9 +307,9 @@ class CreateDBWindow(Tk):
     
     
     
-    # MouseWheelScroll() allows the mouse wheel to scroll through the answer
-    #   widgets field once it grows beyond the height of the window
-    # Args:     event = the event that invokes the function
+    # MouseWheelScroll() allows the mouse wheel to scroll through the answers
+    #   canvas
+    # Args:     event = the invoking event
     # Returns:  none
     def MouseWheelScroll(self, event):
     
@@ -310,53 +317,56 @@ class CreateDBWindow(Tk):
     
     
     
-    # NextQuestion() is called by the 'Next question' button. It retrieves the
-    #   contents from all of the window's widgets and passes them to
-    #   CheckFields() in CreateDBLogic.py so the contents can be validated and
-    #   stored before refreshing the widgets for the next question
+    # NextQuestion() is called by the 'Next Question' button. This function
+    #   collects all of the user-provided information from the widgets and
+    #   passes them to the CheckFields() function in CreateDBLogic.py. If all
+    #   of the information passes, it's converted to a JSON format.
     # Args:     none
     # Returns:  none
-    def NextQuestion(self, *args):
+    def NextQuestion(self):
+    
+        # Retreve the question text
+        question_str = self.question_text.get('1.0', 'end').rstrip()
         
-        # Retrieve the text from the quest entry box
-        q_str = self.question_entry.get('1.0', 'end').rstrip()
+        # Retrieve the answer texts
+        answer_strs = []
+        for widget in self.ans_box_list:
+            answer_strs.append(widget.get('1.0', 'end').rstrip())
         
-        # Retrieve the text from the answer entry boxes
-        ans_entries = []
-        for box in self.ans_box_list:
-            ans_entries.append(box.get('1.0', 'end').rstrip())
-        
-        # Retrieve the values from the check buttons
-        cb_checked_list = []
+        # Retrieve the check button values
+        check_list = []
         for cb in self.cb_list:
-            cb_checked_list.append(cb.get())
+            check_list.append(cb.get())
         
-        # Pass all collected info to CheckFields() in CreateDBLogic for
-        #   verification. If all info is valid, it will be placed into
-        #   a JSON-ready format
-        result, msg = CreateDBLogic.CheckFields(q_str, self.INITIAL_Q_TEXT,
-                                                ans_entries,
+        # Pass the info off for validation and storage
+        result, msg = CreateDBLogic.CheckFields(question_str,
+                                                self.INITIAL_Q_TEXT,
+                                                answer_strs,
                                                 self.INITIAL_ANS_TEXT,
-                                                cb_checked_list,
-                                                self.finish_flag)
-        
-        # If there was an error in reading the info, inform the user
+                                                check_list)
         if not result:
-            tk.messagebox.showerror('ERROR', msg)
+            tk.messagebox.showerror('Error', msg)
+            
+            # Bring the creation window back to the forefront of screen
+            self.window.attributes("-topmost", True)
+            self.window.attributes("-topmost", False)
+            return
         
-        # If this function wasn't called by SerializeDB(), refresh the screen
-        #   for a new question
-        elif not self.finish_flag:
-            self.question_frame.forget()
-            self.answers_buttons_frame.forget()
-            self.CreateFrames()
+        # Refresh the widgets
+        self.question_lframe.forget()
+        self.ans_canvas.forget()
+        
+        self.question_num += 1
+        self.ans_index = 0
+        
+        self.CreateQuestion()
+        self.CreateAnswers()
     
     
     
-    # RestoreAnswerField() re-populates answer entry boxes with the initial
-    #   content string if the user shift focus off of an answer entry field
-    #   without entering any contents
-    # Args:     event = the event that invokes the function
+    # RestoreAnswerField() re-inserts the initial answer text entry box
+    #   string if the text was cleared but the user didn't populate the field
+    # Args:     event = the invoking event
     # Returns:  none
     def RestoreAnswerField(self, event):
         if (event.widget.get('1.0', 'end').rstrip() == ''):
@@ -364,10 +374,9 @@ class CreateDBWindow(Tk):
     
     
     
-    # RestoreQuestionField() re-populates answer entry boxes with the initial
-    #   content string if the user shift focus off of the question entry field
-    #   without entering any contents
-    # Args:     event = the event that invokes the function
+    # RestoreQuestionField() re-inserts the initial question text entry box
+    #   string if the text was cleared but the user didn't populate the field
+    # Args:     event = the invoking event
     # Returns:  none
     def RestoreQuestionField(self, event):
         if event.widget.get('1.0', 'end').rstrip() == '':
@@ -375,43 +384,82 @@ class CreateDBWindow(Tk):
     
     
     
-    # SerializeDB() is called by the 'Save & Finish' button. It calls
-    #   NextQuestion() to retrieve the info currently present in the widgets
-    #   before calling SerializeDB() in CreateDBLogic.py. That function saves
-    #   the collected info to a file
+    # SerializeDB() is called by the 'Save & Finish' button. This function
+    #   makes one final check for data to record before prompting the user for
+    #   a filename that gets passed to the SerializeDB() function in
+    #   CreateDBLogic.py. Finally, the new file is passed to the AddQuizFile()
+    #   in MainLogic.py to add the file to the user's listbox
     # Args:     none
     # Returns:  none
-    def SerializeDB(self, *args):
+    def SerializeDB(self):
     
-        # Capture the current data before finalizing
-        self.finish_flag = True
-        self.NextQuestion()
-        
         # Confirm the user is finished before finalizing all the data
-        ask = tk.messagebox.askyesno('Finished?',
-                                     f'Write {self.question_num} questions to file?')
-        if ask:
-            files = [('JSON Files', '*.json'), ('All files', '*.*')]
-            file = tk.filedialog.asksaveasfilename(title = 'Save as...',
-                                                   filetypes = files,
-                                                   defaultextension = '.json')
-            
-            # 'result' indicates the success of the function call. If False,
-            #   'msg' will contain an error message
-            result, msg = CreateDBLogic.SerializeDB(file)
-            
-            if result:
-                tk.messagebox.showinfo('SUCCESS', msg)
-                self.destroy()
-            else:
-                tk.messagebox.showerror('ERROR', msg)
+        ask = tk.messagebox.askyesno('Finish & Save',
+                                     'Ready to save the file?')
+        if not ask:
+            return
+    
+        # Perform a final check of the widgets
+        # Retreve the question text
+        question_str = self.question_text.get('1.0', 'end').rstrip()
+        
+        # Retrieve the answer texts
+        answer_strs = []
+        for widget in self.ans_box_list:
+            answer_strs.append(widget.get('1.0', 'end').rstrip())
+        
+        # Retrieve the check button values
+        check_list = []
+        for cb in self.cb_list:
+            check_list.append(cb.get())
+        
+        result = CreateDBLogic.FinalCheck(question_str, self.INITIAL_Q_TEXT,
+                                          answer_strs, self.INITIAL_ANS_TEXT,
+                                          check_list)
+        if not result:
+            # Data still needs to be recorded before finalizing
+            result, msg = CreateDBLogic.CheckFields(question_str,
+                                                    self.INITIAL_Q_TEXT,
+                                                    answer_strs,
+                                                    self.INITIAL_ANS_TEXT,
+                                                    check_list)
+            if not result:
+                tk.messagebox.showerror('Error', msg)
+                
+                # Bring the creation window back to the forefront of screen
+                self.window.attributes("-topmost", True)
+                self.window.attributes("-topmost", False)
+                return
+        
+        # Prompt the user to save the file
+        files = [('JSON Files', '*.json'), ('All files', '*.*')]
+        cwd = os.getcwd() + '//database'
+        file = tk.filedialog.asksaveasfilename(title = 'Save as...',
+                                               filetypes = files,
+                                               defaultextension = '.json',
+                                               initialdir = cwd)
+        
+        if not file:
+            # Bring the creation window back to the forefront of screen
+            self.window.attributes("-topmost", True)
+            self.window.attributes("-topmost", False)
+            return
+        
+        # Save the file to disk
+        result, msg = CreateDBLogic.SerializeDB(file)
+        if result:
+            tk.messagebox.showinfo('Success', msg)
+            result, msg = MainLogic.AddQuizFile(self.listbox,
+                                                self.current_user, file)
+            self.window.destroy()
+        else:
+            tk.messagebox.showerror('Error', msg)
     
     
     
-    # UnbindMouseWheel() is an event that triggers when the mouse moves away
-    #   from the answer widget frame. It unbinds the mouse wheel so that
-    #   scrolling won't scroll through the widgets
-    # Args:     event = the event that invokes the function
+    # UnbindMouseWheel() removes the mouse wheel's ability to scroll through
+    #   the answers canvas once the mouse is no longer within the canvas field
+    # Args:     event = the invoking event
     # Returns:  none
     def UnbindMouseWheel(self, event):
     

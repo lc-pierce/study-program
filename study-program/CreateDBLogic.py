@@ -1,120 +1,128 @@
 #-----------------------------------------------------------------------------#
 # CreateDBLogic.py                                                            #
 # Author: Logan Pierceall                                                     #
-# Date: March 14, 2022                                                        #
 #-----------------------------------------------------------------------------#
 
 import os
 import json
 from json.decoder import JSONDecodeError
 
+import MainWindow
+
 # Holds all of the dictionary objects containing question info after they've
 #   been serialized by the JSONidy() function
 dict_objects = []
-JSON_INDENT = 4         # Helps to format all JSON-serialized data
+
+# Helps to format all JSON-serialized data
+JSON_INDENT = 4
 
 
 
 # CheckFields() validates the info provided by the user in the Database
 #   Creation window. If all of the info is valid, it will be passed to
 #   the JSONify() function to prepare it for eventual serialization
-# Args:     question = text entered into the 'Question' box
-#           initial_q_text = the text initally placed into the 'Question'
-#                            box when the widget is created
-#           answers = a list containing all of the text entered into each
-#                     individual 'Answer' box
-#           initial_ans_text = the text initially placed into the 'Answer'
-#                              boxes when the widgets are created
-#           cb_vals = a list containing the value of all the 'Correct Answer'
-#                     check boxes. "1" indicates the box was checked
-#           finish_flag = a boolean indicating if this function is being called
-#                         by the 'Save & Finish' button
-# Returns:  True and an empty string if all checks are passed
+# Args:     question         = the question text
+#           initial_q_text   = 'Question' box default placeholder text
+#           answers          = list of answer texts
+#           initial_ans_text = 'Answer' box default placeholder text
+#           cb_vals          = list of 'Correct Answer' check button values
+# Returns:  True if all checks are passed
 #           False and an error message if one of the checks fails
-def CheckFields(question, initial_q_text, answers, initial_ans_text, cb_vals,
-                finish_flag):
+def CheckFields(question, initial_q_text, answers, initial_ans_text, cb_vals):
     
-    # Check that the question field wasn't left empty and doesn't contain the
-    #   initial string contents
-    q_flag = False
-    if question == '' or question == initial_q_text:
-        q_flag = True
+    # Ensure the question box was populated
+    if not question or question == initial_q_text:
+        return False, 'No question entered'
     
-    # Check the answer fields and record the index of every field left empty
-    #   so that they can be compared to the checkbutton values. An answer
-    #   marked 'correct' that was also left empty will throw an error
-    ans_flag = True
-    ans_empties = []
+    # Ensure at least one answer was marked correct
+    no_corrects = True
+    for cb in cb_vals:
+        if cb == 1:
+            no_corrects = False
+            break
+    if no_corrects:
+        return False, 'No answers were marked as correct'
+    
+    # Ensure no answer boxes were left unpopulated while also being marked as
+    #   a correct answer
     index = 0
-    for entry in answers:
-        if entry != '' and entry != initial_ans_text:
-            ans_flag = False
-        else:
-            ans_empties.append(index)
+    for answer in answers:
+        if not answer or answer == initial_ans_text:
+            if cb_vals[index] == 1:
+                msg = f'Answer {index + 1} wasn\'t populated but ' \
+                      'was marked as a correct answer'
+                return False, msg
         index += 1
     
-    # Check the checkbutton values to ensure at least one answer was marked as
-    #   'correct' and record the index of all entries marked 'correct' to
-    #   compare them to the empty answers list
-    cb_flag = True
-    cb_corrects = []
-    index = 0
-    for val in cb_vals:
-        if val == 1:
-            cb_flag = False
-            cb_corrects.append(index)
-        index += 1
-        
-    # First check 'finish_flag'. If it's true, and if all fields were left
-    #   empty, assume this was done intentionally and return without any
-    #   further processing
-    if (finish_flag and q_flag and ans_flag and cb_flag):
-        return True, ''
-    
-    # If the question field was left upopulated, throw an error
-    if q_flag:
-        return False, 'No question entered!'
-    
-    # If all answer fields were left unpopulated, throw an error
-    if ans_flag:
-        return False, 'At least one answer option must be populated.'
-    
-    # If no checkbuttons were marked, throw an error
-    if cb_flag:
-        return False, 'At least one answer must be marked correct.'
-    
-    # If an answer was marked correct but no information was entered into the
-    #   field by the user, throw an error
-    for val in cb_corrects:
-        for entry in ans_empties:
-            if val == entry:
-                return False, 'An empty answer was marked as correct'
-    
-    # If all checks pass, pass the info to JSONify() to prepare for
-    #   serialization
+    # If all checks pass, prepare the information in JOSN format
     JSONify(question, answers, cb_vals, initial_ans_text)
-    return True, ''
+    return True, None
+
+
+
+# FinalCheck() is called before finalizing the file creation. If all of the
+#   fields were left empty, proceed to serializing the data. Otherwise,
+#   the data should be recorded and it is passed to CheckFields()
+# Args:     question         = the question text
+#           initial_q_text   = 'Question' box default placeholder text
+#           answers          = list of answer texts
+#           initial_ans_text = 'Answer' box default placeholder text
+#           cb_vals          = list of 'Correct Answer' check button values
+# Returns:  
+def FinalCheck(question, initial_q_text, answers, initial_ans_text, cb_vals):
+
+    # Flags to mark failed checks
+    question_flag       = False
+    answer_entries_flag = False
+    correct_answer_flag = False
+
+    # Check for an empty question entry
+    if not question or question == initial_q_text:
+        question_flag = True
+    
+    # Check if all answer entries were left empty
+    empty_answers = 0
+    for answer in answers:
+        if not answer or answer == initial_ans_text:
+            empty_answers += 1
+    if empty_answers == len(answers):
+        answer_entries_flag = True
+    
+    # Check if any 'correct answer' check buttons were marked
+    empty_checks = 0
+    for value in cb_vals:
+        if value == 0:
+            empty_checks += 1
+    if empty_checks == len(cb_vals):
+        correct_answer_flag = True
+    
+    # If all checks failed, return True to continue to finalizing the data.
+    #   Otherwise, return False and record the entered data before finalizing
+    #   the data
+    if question_flag and answer_entries_flag and correct_answer_flag:
+        return True
+    else:
+        return False
 
 
 
 # JSONify() inserts the user-provided info into a dictionary structure that
 #   then gets added to a list. Once the file creation is finished, the
 #   list will be written to a file.
-# Args:     question = the question string
-#           answers = the list of answer strings
-#           cb_vals = the list of check button values
+# Args:     question        = the question string
+#           answers         = the list of answer strings
+#           cb_vals         = the list of check button values
 #           intial_ans_text = the string initially inserted into answer boxes
 # Returns:  none
 def JSONify(question, answers, cb_vals, initial_ans_text):
 
-    # Check how many entries were marked correct
+    # Tally the entries marked as correct
     num_correct = 0
     for val in cb_vals:
         if val == 1:
             num_correct += 1
     
-    # If only one correct answer, the question type is single answer. More than
-    #   one correct is a multiple choice
+    # Determine if the question has a single answer or multiple
     if num_correct == 1:
         q_type = 'single'
     else:
@@ -126,26 +134,27 @@ def JSONify(question, answers, cb_vals, initial_ans_text):
         "Question": question
     }
     
-    # Insert the number of answer options, omitting any entries left empty or
-    #   as the initial string inserted into the text box object
-    count = 0
-    for entry in answers:
-        if entry == '' or entry == initial_ans_text:
-            continue
-        count += 1
-    new_entry.update({"NumOfAnswers": count})
+    # Holds the number of total characters in all of the answer entries
+    ans_char_count = 0
     
-    # Insert the individual answer entries, omitting any entries left empty or
-    #   as the initial string inserted into the text box object
+    # Insert the answer entries, omitting any left unpopulated. Also tally
+    #   the number of answer options
     index = 1
+    ans_count = 0
     for entry in answers:
-        # If the answer entry box was left blank, omit it
-        if entry == '' or entry == initial_ans_text:
+        if not entry or entry == initial_ans_text:
             continue
-        
+        ans_count += 1
+        ans_char_count += len(entry)
         key_str = 'Answer' + str(index)
         new_entry.update({key_str: entry})
         index += 1
+    
+    # Insert the number of answer options
+    new_entry.update({"NumOfAnswers": ans_count})
+    
+    # Insert the total number of characters in the answer strings
+    new_entry.update({'CharCount': ans_char_count})
     
     # A single correct answer is entered directly into the dictionary, while
     #   multiple correct answers are first placed into a list
@@ -155,10 +164,11 @@ def JSONify(question, answers, cb_vals, initial_ans_text):
         if val == 1:
             if num_correct == 1:
                 new_entry.update({'Correct': answers[index]})
+                break
             else:
                 ans_list.append(answers[index])
         index += 1
-    if len(ans_list) > 0:
+    if ans_list:
         new_entry.update({'Correct': ans_list})
         
     # Add the new dictionary object to the list
@@ -175,13 +185,12 @@ def SerializeDB(file):
     try:
         with open(file, 'w') as outfile:
             json.dump(dict_objects, outfile, indent = JSON_INDENT)
-            return True, f'{os.path.basename(file)} successfully saved!'
+        
+        return True, f'{os.path.basename(file)} successfully saved!'
     
-    except IOError:
+    except (IOError, JSONDecodeError):
+        # Some system feature is preventing the file from being created
         return False, f'{os.path.basename(file)} could not be created'
-    
-    except JSONDecodeError:
-        return False, f'Unable to write to {os.path.basename(file)}'
     
     except:
         return False, 'Unexpected error encountered'

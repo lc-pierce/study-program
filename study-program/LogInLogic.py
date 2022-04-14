@@ -1,10 +1,9 @@
 #-----------------------------------------------------------------------------#
 #   LogInLogic.py                                                             #
 #   Author: Logan Pierceall                                                   #
-#   Date: March 9, 2022                                                       #
 #                                                                             #
-#   This file contains the backend code utilized by the Log In window. The    #
-#       frontend code can be found within LogInWindow.py                      #
+#   This module contains the backend code utilized by the Log In window. The  #
+#       frontend code can be found in LogInWindow.py                          #
 #                                                                             #
 #   This code primarily maintains the file containing user information, which #
 #       is saved as the variable USER_INFO. The USER_INFO file is a JSON file #
@@ -26,7 +25,8 @@ import MainLogic
 # The 'users.json' file contains a list of users and their passwords
 USER_INFO = 'users.json'
 
-JSON_INDENT = 4         # Helps to format all JSON-serialized data
+# Helps to format all JSON-serialized data
+JSON_INDENT = 4
 
 
 
@@ -47,7 +47,7 @@ def ChangePassword(username, password, confirm_password):
     # Ensure both password fields aren't empty
     if not password:
         return False, 'No password entered.'
-    elif not confirm_password:
+    if not confirm_password:
         return False, 'Please confirm the password.'
     
     # Ensure that the passwords match
@@ -56,7 +56,7 @@ def ChangePassword(username, password, confirm_password):
     
     # Update the user's password
     try:
-        with open(USER_INFO, 'w+') as file:
+        with open(USER_INFO, 'r+') as file:
             existing_data = json.load(file)
             for entry in existing_data:
                 if entry['User'] == username:
@@ -64,22 +64,21 @@ def ChangePassword(username, password, confirm_password):
                     file.seek(0)
                     json.dump(existing_data, file, indent = JSON_INDENT)
                     file.truncate()
-                    return True, 'Password successfully reset!'
+                    return True, 'Password successfully changed!'
         
         # Returns if the username isn't found within USER_INFO
         return False, f'{username} not found.'
     
-    # Exception catches if the USER_INFO file doesn't exist
     except IOError:
-        return False, GetErrorMessage('IOError')
+        # USER_INFO is non-existent or otherwise inaccessible
+        return False, f'Unable to access {USER_INFO}'
     
-    # Exception catches an empty or corrupted USER_INFO file
     except JSONDecodeError:
-        return False, GetErrorMessage('JSONDecodeError')
+        # USER_INFO is empty
+        return False, f'No data found in {USER_INFO}'
     
-    # Exception catches all other errors
     except:
-        return False, GetErrorMessage('')
+        return False, 'Unexpected error encountered'
 
 
 
@@ -99,36 +98,34 @@ def CheckLogin(username, password):
             for entry in existing_data:
                 if entry['User'] == username:
                     if entry['Password'] == password:
-                        return True, ''
+                        return True, None
                     else:
-                        return False, 'Incorrect password'
+                        return False, 'Invalid password'
         
         # Return False if the username isn't found
         return False, f'{username} is not a valid account'
     
-    # Exception catches a non-existent USER_INFO file
     except IOError:
-        return False, GetErrorMessage('IOError')
+        # USER_INFO is non-existent or otherwise inaccessible
+        return False, f'Unable to access {USER_INFO}'
     
-    # Exception catches an empty or corrupted USER_INFO file
     except JSONDecodeError:
-        return False, GetErrorMessage('JSONDecodeError')
+        # USER_INFO is empty
+        return False, f'No data found in {USER_INFO}'
     
-    # Exception catches all other errors
     except:
-        return False, GetErrorMessage('')
+        return False, 'Unexpected error encountered'
 
 
 
-# CreateAccount() creates a new entry in the USER_INFO file containing the
-#   given username and password combination, the date of account creation, and
-#   a placeholder for the last log-in date
-# Args:     username = the new account's username
-#           password = the new account's password
-# Returns:  True and a confirmation message if successful
-#           False and an error message if unable to create the account
+# CreateAccount() prepares a new user dictionary object to add to the
+#   USER_INFO database file.
+# Args:     username = the new user's username
+#           password = the new user's password
+# Returns:  
 def CreateAccount(username, password):
 
+    # Prepare the user info for JSON
     user = {
         'User': username,
         'Password': password,
@@ -137,60 +134,35 @@ def CreateAccount(username, password):
     }
     
     try:
-        with open(USER_INFO, 'r+') as file:
-            existing_data = json.load(file)
+        with open(USER_INFO, 'r+') as outfile:
+            existing_data = json.load(outfile)
             existing_data.append(user)
-            file.seek(0)
-            json.dump(existing_data, file, indent = JSON_INDENT)
-            file.truncate()
-        
-    # If the USER_INFO file exists but is not populated, JSON throws an error
-    #   when trying to load data. Instead, dump data without attempting to load
-    except JSONDecodeError:
-        new_list = [user]
-        with open(USER_INFO, 'r+') as file:
-            json.dump(new_list, file, indent = JSON_INDENT)
-            file.truncate()
+            outfile.seek(0)
+            json.dump(existing_data, outfile, indent = JSON_INDENT)
+            outfile.truncate()
     
-    # If the USER_INFO file doesn't exist, an IOError is throw. Open the file
-    #   in 'w+' mode so it gets created before opening
-    except IOError:
+    except (IOError, JSONDecodeError):
+        # User file doesn't exist or is corrupted/empty. Open in 'w+' mode to
+        #   create a fresh file
         new_list = [user]
-        with open(USER_INFO, 'w+') as file:
-            json.dump(new_list, file, indent = JSON_INDENT)
-            file.truncate()
         
-    # Exception catches all other errors
+        try:
+            with open(USER_INFO, 'w+') as outfile:
+                json.dump(new_list, outfile, indent = JSON_INDENT)
+                outfile.truncate()
+        
+        except:
+            # Further errors indicate the user can't be added
+            return False, 'Unexpected error encountered. Account not created.'
+            
     except:
-        return False, False, 'Account unable to be created.'
+        # Any other errors likely resulted in the user not being added
+        return False, 'Unexpected error encountered. Account not created.'
     
-    # If the account was created, send the username to the AddNewUser()
-    #   function in MainLogic.py in order to add it to the database that
-    #   tracks a user's quiz files
+    # Send the username to the AddNewUser() function in MainLogic.py to add
+    #   the user to a file containing each user's quiz database files
     result, msg = MainLogic.AddNewUser(username)
-    
-    if result:
-        msg = f'Account created for {username}.\nLog in as {username}?'
-    return True, result, msg
-
-
-
-# GetErrorMessage() is used to return error messages for all errors associated
-#   with operations involving USER_INFO
-# Args:     error_type = a string indicating the error type
-# Returns:  the specific error message string
-def GetErrorMessage(error_type):
-    # Error message for a non-existent USER_INFO file
-    if error_type == 'IOError':
-        return f'Error opening {USER_INFO}'
-    
-    # Error message for an empty or corrupted USER_INFO file
-    elif error_type == 'JSONDecodeError':
-        return f'Error loading information from {USER_INFO}'
-    
-    # Error message for all other unexpected errors
-    else:
-        return 'Unexpected error encountered'
+    return True, None
 
 
 
@@ -206,15 +178,15 @@ def GetLastLogIn(username):
             existing_data = json.load(file)
             for entry in existing_data:
                 if entry['User'] == username:
-                    # Retrieve the last log-in date then update the last date
+                    # Retrieve the last log-in date, then update the last date
                     #   to reflect the current activity
                     previous_login = entry['LastLogIn']
                     entry['LastLogIn'] = date.today().strftime('%B %d, %Y')
             file.seek(0)
             json.dump(existing_data, file, indent = JSON_INDENT)
             file.truncate()
+            
+            return previous_login
 
     except:
-        previous_login = 'Error encountered'
-    
-    return previous_login
+        return None
