@@ -1,8 +1,10 @@
 #-----------------------------------------------------------------------------#
-#   QuizWindow.py                                                             #
+#   File:   QuizWindow.py                                                     #
 #   Author: Logan Pierceall                                                   #
 #                                                                             #
-#   This module creates the quiz window.
+#   This module creates the window used to take a quiz.                       #
+#                                                                             #
+#   The supporting backend code for this module can be found in QuizLogic.py  #
 #-----------------------------------------------------------------------------#
 
 import random

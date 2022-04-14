@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------#
-#   LogInWindow.py                                                            #
+#   File:   LogInWindow.py                                                    #
 #   Author: Logan Pierceall                                                   #
 #                                                                             #
 #   This module creates an initial log-in window. This window allows a user   #
@@ -7,7 +7,7 @@
 #       After providing valid login information, control is passed to the     #
 #       main window, whose code can be found in MainWindow.py.                #
 #                                                                             #
-#   The supporting backend code for this module is found in LogInLogic.py.    #
+#   The supporting backend code for this module can be found in LogInLogic.py #
 #-----------------------------------------------------------------------------#
 
 import os

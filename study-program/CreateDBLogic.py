@@ -1,6 +1,8 @@
 #-----------------------------------------------------------------------------#
-# CreateDBLogic.py                                                            #
-# Author: Logan Pierceall                                                     #
+#   File:   CreateDBLogic.py                                                  #
+#   Author: Logan Pierceall                                                   #
+#                                                                             #
+#   This module contains the backend code utilized by CreateDBWindow.py       #
 #-----------------------------------------------------------------------------#
 
 import os

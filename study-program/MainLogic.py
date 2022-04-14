@@ -1,9 +1,8 @@
 #-----------------------------------------------------------------------------#
-#   MainLogic.py                                                              #
+#   File:   MainLogic.py                                                      #
 #   Author: Logan Pierceall                                                   #
 #                                                                             #
-#   This module contains the backend code utilized by the Main Window. The    #
-#       frontend code can be found in MainWindow.py.                          #
+#   This module contains the backend code utilized by MainWindow.py           #
 #                                                                             #
 #   This code makes extensive use of the file containing each user's          #
 #       personal quiz database files, which is saved as the variable          #

@@ -1,7 +1,13 @@
 #-----------------------------------------------------------------------------#
-# CreateDBWindow.py                                                           #
-# Author: Logan Pierceall                                                     #
-# Date: March 14, 2022                                                        #
+#   File:   CreateDBWindow.py                                                 #
+#   Author: Logan Pierceall                                                   #
+#                                                                             #
+#   This module creates a window identical in appearance to the quiz window   #
+#       that serves as a template to allow the user to create a new database  #
+#       file. The file is saved in '.json' format.                            #
+#                                                                             #
+#   The supporting backend code for this module can be found in               #
+#       CreateDBLogic.py                                                      #
 #-----------------------------------------------------------------------------#
 
 import os

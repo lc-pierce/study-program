@@ -1,6 +1,8 @@
 #-----------------------------------------------------------------------------#
-#   QuizLogic.py                                                              #
+#   File:   QuizLogic.py                                                      #
 #   Author: Logan Pierceall                                                   #
+#                                                                             #
+#   This module contains the backend code utilized by QuizWindow.py           #
 #-----------------------------------------------------------------------------#
 
 import random
@@ -24,7 +26,6 @@ def CheckCB(user_choices, entry):
         len(user_answers) > len(entry['Correct'])):
         return False, user_answers
     
-    # Copy the 'correct' list to avoid altering the 'entry' object
     correct_answers = entry['Correct'].copy()
     
     # Check the user's answers against the correct list

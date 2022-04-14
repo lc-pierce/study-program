@@ -1,6 +1,5 @@
 #-----------------------------------------------------------------------------#
-#                                                                             #
-#   Widgets.py                                                                #
+#   File:   Widgets.py                                                        #
 #   Author: Logan Pierceall                                                   #
 #                                                                             #
 #   This module contains constructor functions for all of the tkinter widgets #

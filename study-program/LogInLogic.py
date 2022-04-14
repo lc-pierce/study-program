@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------#
-#   LogInLogic.py                                                             #
+#   File:   LogInLogic.py                                                     #
 #   Author: Logan Pierceall                                                   #
 #                                                                             #
 #   This module contains the backend code utilized by the Log In window. The  #

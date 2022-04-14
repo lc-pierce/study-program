@@ -8,7 +8,7 @@
 #       also able to create a new quiz database file using an interactive     #
 #       template window. That window's code is found in CreateDBWindow.py.    #
 #                                                                             #
-#   The supporting backend code for this module is found in MainLogic.py.     #
+#   The supporting backend code for this module can be found in MainLogic.py  #
 #-----------------------------------------------------------------------------#
 
 import os
