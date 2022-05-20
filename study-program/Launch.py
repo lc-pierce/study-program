@@ -1,14 +1,14 @@
-#-----------------------------------------------------------------------------#
-#   File:   Launch.py                                                         #
-#   Author: Logan Pierceall                                                   #
-#                                                                             #
-#   This module launches the program by calling the function to create the    #
-#       initial log-in window found in LogInWindow.py                         #
-#-----------------------------------------------------------------------------#
+import os
 
 import LogInWindow
 
 if __name__ == '__main__':
-
+    
+    # Create the folder to store quiz files if not already present
+    try:
+        os.mkdir('database')
+    except:
+        pass
+    
     app = LogInWindow.LogInWindow()
     app.mainloop()

@@ -1,345 +1,403 @@
-#-----------------------------------------------------------------------------#
-#   File:   Main.py                                                           #
-#   Author: Logan Pierceall                                                   #
-#                                                                             #
-#   This module creates the main program window. This window allows a user to #
-#       add quiz database files to a listbox in order to load them into a     #
-#       quiz. The quiz window logic can be found in QuizWindow.py. Users are  #
-#       also able to create a new quiz database file using an interactive     #
-#       template window. That window's code is found in CreateDBWindow.py.    #
-#                                                                             #
-#   The supporting backend code for this module can be found in MainLogic.py  #
-#-----------------------------------------------------------------------------#
-
+import json
+from json.decoder import JSONDecodeError
 import os
 import tkinter as tk
+from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import Tk
 
 import CreateDBWindow
 import LogInWindow
-import MainLogic
 import QuizWindow
 import Widgets
-
 
 
 class MainWindow():
 
     def __init__(self, root_window, username, login_date):
     
-        self.root         = root_window
+        self.root = root_window
         self.current_user = username
+        self.last_login = login_date
         
-        # 'login_date' contains the last recorded log-in date for the user. If
-        #   they've never logged in prior, the argument will be an empty string
-        if not login_date:
-            self.last_login = 'Never!'
-        else:
-            self.last_login = login_date
+        # Button height and width constants
+        self.button_height = 3
+        self.button_width = 30
         
-        # Widget option constants
-        self.BUT_HEIGHT = 3
-        self.BUT_WIDTH  = 30
-        self.WHITE      = '#f8f8ff'
+        # Load the user files info
+        self.DB_FILE = 'previousfiles.json'
+        self.user_files = self.LoadDatabase()
         
-        self.CreateWindow()
+        # Function to save user data if the window is exited
+        self.root.protocol('WM_DELETE_WINDOW', self.OnClose)
+        
+        # Load the window and widgets
+        self.InitializeWindow()
     
     
-    
-    # AddFile() is called by the 'Add New File' button. It calls
-    #   AddQuizFile() function in MainLogic.py, which allows a user to select
-    #   a new file to add to the listbox widget
-    # Args:     none
-    # Returns:  none
     def AddFile(self):
-    
-        # If 'result' is False, 'msg' contains an error message
-        result, msg = MainLogic.AddQuizFile(self.listbox, self.current_user)
-        if not result:
-            tk.messagebox.showerror('Error', msg)
-    
-    
-    
-    def BindMouseWheel(self, event):
-    
-        self.listbox.bind_all('<MouseWheel>', self.MouseWheelScroll)
-    
-    
-    
-    # CreateDBFile() is called by the 'Create New Database File' button. It
-    #   calls the CreateDBWindow() function in CreateDBWindow.py, which
-    #   allows a user to use a template to create a new quiz database
-    # Args:     none
-    # Returns:  none
-    def CreateDBFile(self):
-    
-        CreateDBWindow.CreateDBWindow(self.root, self.current_user,
-                                      self.listbox)
+        """Add a new quiz file to the user's file list.
+        
+        This function is called by the 'Add New File' button.
+        """
+        
+        new_file = filedialog.askopenfilename(title='Select a file...',
+                                          filetypes=[('JSON Files', '*.json')])
+        if not new_file:
+            return
+        
+        # Verify the file isn't already in the user's list
+        for file in self.user_files:
+            if file == new_file:
+                messagebox.showerror('Error', 'File already present.')
+                return
+        
+        self.user_files.append(new_file)
+        self.listbox.insert('end', os.path.basename(new_file))
     
     
+    def CreateNewDatabaseFile(self):
+        """Launch a window to create a new quiz database file.
+        
+        This function is called by the 'Create New Database File' button.
+        """
+        
+        CreateDBWindow.CreateDBWindow(root_window=self.root,
+                                      user_files=self.user_files,
+                                      parent_listbox=self.listbox)
     
-    # CreateFilesButtons() initializes the two buttons used to interact with
-    #   the listbox widget. These allow a user to add a new file to the listbox
-    #   or remove an existing file from the listbox
-    # Args:     none
-    # Returns:  none
-    def CreateFilesButtons(self):
     
-        # Window coordinates
+    def InitializeListbox(self, parent_frame):
+    
+        """Initialize the Listbox widget and populate it with quiz files.
+        
+        The Listbox widget holds a user's quiz database files. The files
+            selected before launching the quiz will be used to populate the
+            quiz. Once a file has been loaded once, it will be saved to the
+            user's file list and automatically loaded into the Listbox on
+            subsequent logins.
+        
+        Arguments:
+            parent_frame: the Frame that holds the Listbox widget
+        """
+        
+        def BindMouseWheel(event):
+            """Bind the mouse wheel to scroll through the Listbox."""
+            
+            self.listbox.bind_all('<MouseWheel>', Scroll)
+        
+        def Scroll(event):
+            """Set the parameters for the mouse wheel to scroll."""
+            
+            self.listbox.yview_scroll(int(-1*(event.delta/120)), 'units')
+        
+        
+        labelframe = Widgets.CreateLabelFrame(parent_frame,
+                                              _text='Select Files To Load')
+        labelframe.pack(fill = 'both', expand = 'true')
+        
+        scrollbar = Widgets.CreateScrollbar(labelframe)
+        self.listbox = Widgets.CreateListbox(labelframe, _scrollbar=scrollbar)
+        scrollbar.config(command=self.listbox.yview,
+                         scrollregion=self.listbox.bbox('end'))
+        scrollbar.pack(side='right', fill='y')
+        self.listbox.pack(fill='both', expand='true')
+        
+        # Bind the mouse wheel to scroll the scrollbar whenever the mouse is
+        #   within the listbox boundaries
+        self.listbox.bind('<Enter>', BindMouseWheel)
+        self.listbox.bind('<Leave>',
+                          lambda e: self.listbox.unbind_all('<MouseWheel>'))
+        
+        # Fill the Listbox with the user's previously opened files
+        for file in self.user_files:
+            self.listbox.insert('end', os.path.basename(file))
+    
+    
+    def InitializeListboxButtons(self, parent_frame):
+        """Initialize buttons to add/remove quiz files within the Listbox.
+        
+        Arguments:
+            parent_frame: the Frame that holds the Buttons
+        """
+        
+        def RemoveFile():
+            """Call the function to remove a file from the user's list.
+            
+            This function is called by the 'Remove Selected Files' button.
+            """
+            
+            if self.RemoveFile():
+                # Re-populate the listbox with the updated file list
+                self.listbox.delete(0, 'end')
+                for file in self.user_files:
+                    self.listbox.insert('end', os.path.basename(file))
+        
+        
+        # Create a button to add files to the listbox
+        add_button = Widgets.CreateButton(parent_frame,
+                                          _text='Add\nNew File',
+                                          _cmd=self.AddFile,
+                                          _height=self.button_height)
+        add_button.pack(side='left', expand='true')
+        
+        # Create a button to remove a file from the listbox
+        remove_button = Widgets.CreateButton(parent_frame,
+                                             _text='Remove\n Selected File(s)',
+                                             _cmd=RemoveFile,
+                                             _height=self.button_height)
+        remove_button.pack(side='right', expand='true')
+    
+    
+    def InitializeMainButtons(self, parent_frame):
+        """Initialize buttons to launch a quiz and create a new quiz file.
+        
+        Arguments:
+            parent_frame: the Frame that holds the buttons.
+        """
+        
+        def Load():
+            """Call the function to load selected quiz files and launch quiz.
+        
+            This function is called by the 'Load Files & Launch Quiz' button.
+            """
+            result, quiz = self.LoadQuizFiles()
+            if result:
+                self.SaveData()
+                QuizWindow.QuizWindow(self.root, quiz)
+        
+        
+        launch_button = Widgets.CreateButton(parent_frame,
+                                             _text='Load Files & Launch Quiz',
+                                             _cmd=Load,
+                                             _height=self.button_height,
+                                             _width=self.button_width)
+        launch_button.pack(expand='true')
+        create_button = Widgets.CreateButton(parent_frame,
+                                             _text='Create New Database File',
+                                             _cmd=self.CreateNewDatabaseFile,
+                                             _height=self.button_height,
+                                             _width=self.button_width)
+        create_button.pack(expand='true')
+    
+    
+    def InitializeWelcomeMessage(self, parent_frame):
+        """Initialize a label welcoming the user to the program.
+        
+        Arguments:
+            parent_frame: the Frame that holds the welcome label and logout
+                          button.
+        """
+        
+        def Logout():
+            """Log the current user out of the program.
+            
+            This function is called by the 'Log Out' button.
+            """
+            
+            self.SaveData()
+            self.root.destroy()
+            LogInWindow.LogInWindow()
+        
+        
+        welcome_str = f'\nWelcome, {self.current_user}!'
+        if self.last_login:
+            welcome_str += f'\n\nLast seen {self.last_login}'
+        welcome_label = Widgets.CreateLabel(parent_frame, _text=welcome_str)
+        welcome_label.pack(fill='both', expand='true')
+        
+        # Create a logout button
+        logout_frame = Widgets.CreateFrame(parent_frame)
+        logout_frame.pack(side='bottom', fill='x')
+        logout_button = Widgets.CreateButton(logout_frame, _text='Log Out',
+                                             _cmd=Logout,
+                                             _height=1)
+        logout_button.pack()
+    
+    
+    def InitializeWindow(self):
+        """Initialize the main program window and load widgets."""
+        
+        self.root.title('')
+        self.main_frame = Widgets.CreateFrame(self.root)
+        self.main_frame.pack(fill='both', expand='true')
+        self.main_canvas = Widgets.CreateCanvas(self.main_frame)
+        self.main_canvas.pack(fill='both', expand='true')
+        
+        white = '#f8f8ff'
+        # Create and populate the Listbox widget
+        topx = topy = 5
+        botx = boty = 445
+        self.main_canvas.create_rectangle(topx, topy, botx, boty,
+                                          fill=white)
+        listbox_frame = Widgets.CreateFrame(self.main_canvas)
+        self.main_canvas.create_window(topx + 2, topy + 2, anchor='nw',
+                                       height=boty - topy - 2,
+                                       width=botx - topx - 2,
+                                       window=listbox_frame)
+        self.InitializeListbox(listbox_frame)
+        
+        # Create the Listbox interaction buttons
         topx = 5
         topy = 460
         botx = 445
         boty = 570
-    
-        # Create a rectangle to hold listbox interaction buttons
         self.main_canvas.create_rectangle(topx, topy, botx, boty,
-                                          fill = self.WHITE)
-    
-        # Create a frame within the given rectangle
-        buttons_frame = Widgets.CreateFrame(self.main_canvas)
-        self.main_canvas.create_window(topx + 2, topy + 2, anchor = 'nw',
-                                       height = boty - topy - 2,
-                                       width = botx - topx - 2,
-                                       window = buttons_frame)
+                                          fill=white)
+        listbox_buttons_frame = Widgets.CreateFrame(self.main_canvas)
+        self.main_canvas.create_window(topx + 2, topy + 2, anchor='nw',
+                                       height=boty - topy - 2,
+                                       width=botx - topx - 2,
+                                       window=listbox_buttons_frame)
+        self.InitializeListboxButtons(listbox_buttons_frame)
         
-        # Create a button to add files to the listbox
-        add_button = Widgets.CreateButton(buttons_frame, 'Add\nNew File',
-                                          self.AddFile, self.BUT_HEIGHT)
-        add_button.pack(side = 'left', expand = 'true')
-        
-        # Create a button to remove a file from the listbox
-        remove_button = Widgets.CreateButton(buttons_frame,
-                                             'Remove\n Selected File(s)',
-                                             self.RemoveFile, self.BUT_HEIGHT)
-        remove_button.pack(side = 'right', expand = 'true')
-    
-    
-    
-    # CreateFilesListbox() initializes the listbox widget that holds the quiz
-    #   database files that the user has previously opened.
-    # Args:     none
-    # Returns:  none     
-    def CreateFilesListbox(self):
-    
-        # Window coordinates
-        topx = topy = 5
-        botx = boty = 445
-    
-        # Create a rectangle to hold the listbox
-        self.main_canvas.create_rectangle(topx, topy, botx, boty,
-                                          fill = self.WHITE)
-        
-        # Create a frame within that rectangle
-        listbox_frame = Widgets.CreateFrame(self.main_canvas)
-        self.main_canvas.create_window(topx + 2, topy + 2, anchor = 'nw',
-                                       height = boty - topy - 2,
-                                       width = botx - topx - 2,
-                                       window = listbox_frame)
-        
-        # Create a labelframe for the listbox
-        labelframe = Widgets.CreateLabelFrame(listbox_frame, 'Select Files')
-        labelframe.pack(fill = 'both', expand = 'true')
-        
-        # Create the listbox and a scrollbar
-        self.scrollbar = Widgets.CreateScrollbar(labelframe)
-        self.listbox = Widgets.CreateListbox(labelframe, self.scrollbar)
-        self.scrollbar.config(command = self.listbox.yview,
-                              scrollregion = self.listbox.bbox('end'))
-        
-        self.scrollbar.pack(side = 'right', fill = 'y')
-        self.listbox.pack(fill = 'both', expand = 'true')
-        
-        # Bind the mouse wheel to scroll the scrollbar whenever the mouse is
-        #   within the listbox boundaries
-        self.listbox.bind('<Enter>', self.BindMouseWheel)
-        self.listbox.bind('<Leave>', self.UnbindMouseWheel)
-    
-    
-    
-    # CreateMainButtons() initializes a button that allows a user to load
-    #   quiz database files and launch a quiz and a button that allows a user
-    #   to create a new quiz database file
-    # Args:     none
-    # Returns:  none
-    def CreateMainButtons(self):
-    
-        # Window coordinates
-        topx = 455
-        topy = 267
-        botx = 885
-        boty = 492
-    
-        # Create a rectangle to hold the main buttons
-        self.main_canvas.create_rectangle(topx, topy, botx, boty,
-                                          fill = self.WHITE)
-    
-        # Create a frame within the given rectangle
-        buttons_frame = Widgets.CreateFrame(self.main_canvas)
-        self.main_canvas.create_window(topx + 2, topy + 2, anchor = 'nw',
-                                       height = boty - topy - 2,
-                                       width = botx - topx - 2,
-                                       window = buttons_frame)
-        
-        # Create a button to load selections and launch the quiz
-        launch_button = Widgets.CreateButton(buttons_frame,
-                                             'Load Files & Launch Quiz',
-                                             self.LaunchQuiz,
-                                             self.BUT_HEIGHT,
-                                             self.BUT_WIDTH)
-        launch_button.pack(expand = 'true')
-        
-        # Create a button to create a new database file
-        create_button = Widgets.CreateButton(buttons_frame,
-                                             'Create New Database File',
-                                             self.CreateDBFile,
-                                             self.BUT_HEIGHT,
-                                             self.BUT_WIDTH)
-        create_button.pack(expand = 'true')
-    
-    
-    
-    # CreateWelcomeMessage() initializes a label that welcomes the user to the
-    #   program and displays the last date that they logged in
-    # Args:     none
-    # Returns:  none
-    def CreateWelcomeMessage(self):
-    
-        # Window coordinates
+        # Create the welcome message label and logout button
         topx = 455
         topy = 5
         botx = 885
         boty = 155
-        
-        # Create a rectangle to hold the welcome message
         self.main_canvas.create_rectangle(topx, topy, botx, boty,
-                                          fill = self.WHITE)
-    
-        # Create a frame within the given rectangle
+                                          fill=white)
         welcome_frame = Widgets.CreateFrame(self.main_canvas)
-        self.main_canvas.create_window(topx + 2, topy + 2, anchor = 'nw',
-                                       height = boty - topy - 2,
-                                       width = botx - topx - 2,
-                                       window = welcome_frame)
-        
-        welcome_str = f'\n\nWelcome, {self.current_user}!\n\n' \
-                      f'Last Seen {self.last_login}'
-        welcome_label = Widgets.CreateLabel(welcome_frame, welcome_str)
-        welcome_label.pack(fill = 'both', expand = 'true')
-    
-    
-    
-    # CreateWindow() initializes a main frame and canvas that cover the entire
-    #   window. The function also calls the functions responsible for
-    #   populating the window with widgets
-    # Args:     none
-    # Returns:  none
-    def CreateWindow(self):
-    
-        self.main_frame = Widgets.CreateFrame(self.root)
-        self.main_frame.pack(fill = 'both', expand = 'true')
-        
-        self.main_canvas = Widgets.CreateCanvas(self.main_frame)
-        self.main_canvas.pack(fill = 'both', expand = 'true')
-        
-        # Create and populate the listbox
-        self.CreateFilesListbox()
-        self.PopulateListbox()
-        
-        # Create the listbox interaction buttons
-        self.CreateFilesButtons()
-        
-        # Create the welcome message
-        self.CreateWelcomeMessage()
+        self.main_canvas.create_window(topx + 2, topy + 2, anchor='nw',
+                                       height=boty - topy - 2,
+                                       width=botx - topx - 2,
+                                       window=welcome_frame)
+        self.InitializeWelcomeMessage(welcome_frame)
         
         # Create the main program buttons
-        self.CreateMainButtons()
+        topx = 455
+        topy = 267
+        botx = 885
+        boty = 492
+        self.main_canvas.create_rectangle(topx, topy, botx, boty,
+                                          fill=white)
+        main_buttons_frame = Widgets.CreateFrame(self.main_canvas)
+        self.main_canvas.create_window(topx + 2, topy + 2, anchor='nw',
+                                       height=boty - topy - 2,
+                                       width=botx - topx - 2,
+                                       window=main_buttons_frame)
+        self.InitializeMainButtons(main_buttons_frame)
     
     
-    
-    # LaunchQuiz() is called by the 'Load Files & Launch Quiz' button. This
-    #   function retrieves the files selected in the listbox widget and passes
-    #   those selections to the LoadQuiz() function in MainLogic.py
-    # Args:     none
-    # Returns:  none
-    def LaunchQuiz(self):
-    
-        selections = self.listbox.curselection()
+    def LoadDatabase(self):
+        """Load the user's quiz file history from the database file.
         
-        if selections:
-            # 'result' will indicate success status, 'msg' will contain an error
-            #   message if applicable, 'quiz' holds the loaded quiz list
-            result, msg, quiz = MainLogic.LoadQuiz(selections,
-                                                   self.current_user)
-            if result:
-                QuizWindow.QuizWindow(self.root, quiz)
-            else:
-                tk.messagebox.showerror('Error', msg)
-                
-        # Throw error if no files were selected
-        else:
-            tk.messagebox.showerror('Error', 'No files selected!')
-    
-    
-    
-    def MouseWheelScroll(self, event):
-    
-        self.listbox.yview_scroll(int(-1 * (event.delta / 120)), 'units')
-    
-    
-    
-    # PopulateListbox() calls the PopulateListbox() function in MainLogic.py.
-    #   That function opens a JSON file containing the previously loaded quiz
-    #   files for all users and loads the files specific to the current user
-    #   into the listbox widget
-    # Args:     none
-    # Returns:  none
-    def PopulateListbox(self):
-    
-        # If 'result' is False, 'msg' will contain an error message
-        result, msg = MainLogic.PopulateListbox(self.current_user,
-                                                self.listbox) 
-        if not result:
-            tk.messagebox.showerror('Error', msg)
-    
-    
-    
-    # RemoveFile() retrieves the currently selected file(s) in the listbox and
-    #   removes it from the user's previously opened files.
-    # Args:     none
-    # Returns:  none
-    def RemoveFile(self):
-    
-        selections = self.listbox.curselection()
+        This function opens the file containing the quiz database files each
+            user has utilized in the past and loads the files associated with
+            the current user into a list. If any changes are made to this list,
+            they will be saved back to the file once a quiz begins.
+        """
         
+        db_data = []
+        try:
+            with open(self.DB_FILE, 'r') as infile:
+                db_data = json.load(infile)
+            db_data = db_data[self.current_user]
+        except IOError:
+            # The database file is nonexistent or corrupt and should be
+            #   created as a fresh file
+            with open(self.DB_FILE, 'w') as infile:
+                pass
+        except JSONDecodeError:
+            tk.messagebox.showerror('Error',
+                                    f'Unable to load data from {self.DB_FILE}')
+        except:
+            tk.messagebox.showerror('Error', 'Unexpected error encountered')
+        
+        return db_data
+    
+    
+    def LoadQuizFiles(self):
+        """Load the selected quiz files into a list.
+        
+        Returns:
+            'True' and a list containing file contents if files were selected
+                and at least one file was able to be loaded.
+            'False' and 'None' if no files were selected, no files could be
+                accessed, or the user chose not to proceed after encountering
+                errors loading the files.
+        """
+        
+        selections = self.listbox.curselection()
         if not selections:
-            # No files have been selected, cancel operation
-            tk.messagebox.showerror('Error', 'Select one or more files first')
-            return
+            tk.messagebox.showerror('Error', 'No files selected!\nSelect ' \
+                                             'files from the listbox prior ' \
+                                             'to launching a quiz.')
+            return False, None
         
-        files_list = []
-        for item in selections:
-            # Retrieve the full pathname for the file chosen
-            result, file = MainLogic.GetFilename(item, self.current_user)
-            
-            if result:
-                files_list.append(file)
-            else:
-                # If the operation failed, 'file' contains the error message
-                tk.messagebox.showerror('Error', file)
+        # Load the contents of selected files
+        quiz = []
+        error_msg = 'Error accessing the following files:\n'
+        errors_flag = False
+        for index in selections:
+            try:
+                with open(self.user_files[index], 'r') as infile:
+                    quiz.extend(json.load(infile))
+            except:
+                # Create a composite error message for inaccessible files
+                errors_flag = True
+                error_msg += f'{os.path.basename(self.user_files[index])}\n'
         
-        # Remove the chosen files from the user's file list
-        result, msg = MainLogic.RemoveFile(files_list, self.current_user)
-        if not result:
-            tk.messagebox.showerror('Error', msg)
-            return
+        if not quiz:
+            tk.messagebox.showerror('Error', 'No files could be accessed')
+            return False, None
         
-        # Rebuild the listbox
-        self.listbox.delete(0, 'end')
-        self.PopulateListbox()
+        if errors_flag:
+            error_msg += 'Contents from those files won\'t be added. Continue?'
+            ask = tk.messagebox.askyesno('Error', error_msg)
+            if not ask:
+                return False, None
+        
+        return True, quiz
     
     
+    def OnClose(self):
+        """Save user file data before exiting the program."""
+        
+        self.SaveData()
+        self.root.destroy()
     
-    def UnbindMouseWheel(self, event):
     
-        self.listbox.unbind_all('<MouseWheel>')
+    def RemoveFile(self):
+        """Remove selected file(s) from the user's file list.
+        
+        Files must be selected in the Listbox prior to clicking the button.
+        
+        Returns:
+            'True' if files were selected and removed from the list.
+            'False' if no files from the Listbox were selected or files weren't
+                able to be removed from the list.
+        """
+        
+        selections = self.listbox.curselection()
+        if not selections:
+            messagebox.showerror('Error', 'Select one or more files first')
+            return False
+        
+        new_files = []
+        for i, file in enumerate(self.user_files, 0):
+            if i in selections:
+                continue
+            new_files.append(file)
+        if new_files == self.user_files:
+            messagebox.showerror('Error', 'Files were not able to be removed.')
+            return False
+        self.user_files = new_files
+        return True
+    
+    
+    def SaveData(self):
+        """Save the user's file information to the database file."""
+        
+        try:
+            with open(self.DB_FILE, 'r+') as outfile:
+                existing_data = json.load(outfile)
+                existing_data[self.current_user] = self.user_files
+                outfile.seek(0)
+                json.dump(existing_data, outfile, indent=4)
+                outfile.truncate()
+        except:
+            tk.messagebox.showerror('Error',
+                                    f'{self.DB_FILE} could not be accessed.' \
+                                    'Altered file information won\'t be saved')

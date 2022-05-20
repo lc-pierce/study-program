@@ -1,24 +1,13 @@
-#-----------------------------------------------------------------------------#
-#   File:   LogInWindow.py                                                    #
-#   Author: Logan Pierceall                                                   #
-#                                                                             #
-#   This module creates an initial log-in window. This window allows a user   #
-#       to log in, create a new user account, or reset a forgotten password.  #
-#       After providing valid login information, control is passed to the     #
-#       main window, whose code can be found in MainWindow.py.                #
-#                                                                             #
-#   The supporting backend code for this module can be found in LogInLogic.py #
-#-----------------------------------------------------------------------------#
-
+import json
+from json.decoder import JSONDecodeError
 import os
+from datetime import date
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import Tk
 
-import LogInLogic
 import MainWindow
 import Widgets
-
 
 
 class LogInWindow(Tk):
@@ -27,407 +16,495 @@ class LogInWindow(Tk):
     
         super().__init__(*args, **kwargs)
         
-        # Create the folder to store quiz database files if not already present
-        try:
-            os.mkdir('database')
-        except:
-            pass
+        # Constant height for all Button widgets
+        self.button_height = 3
         
-        # Window dimensions
-        self.WIN_HEIGHT = 600
-        self.WIN_WIDTH  = 900
+        # Variables used to retrieve Entry box contents
+        self.username = tk.StringVar()
+        self.password = tk.StringVar()
+        self.confirm_pass = tk.StringVar()
         
-        # Widget option constants
-        self.BUT_HEIGHT = 3
-        self.WHITE      = '#f8f8ff'
+        # Load the user accounts info
+        self.users_file = 'users.json'
+        self.user_db = self.LoadDatabase()
         
-        self.username     = tk.StringVar()      # Stores 'Username'
-        self.password     = tk.StringVar()      # Stores 'Password'
-        self.confirm_pass = tk.StringVar()      # Stores 'Confirm Password'
-        
-        # Flag that tracks if the user clicks on the 'Forgot password' label.
-        #   Helps designate which widgets to erase when the 'Return to Log In'
-        #   button is clicked
-        self.forgot_flag = False
-            
-        self.CreateWindow()
+        # Load the window and the initial 'Log In' widgets
+        self.InitializeWindow()
+        self.LoadLogInWindow()
     
     
-    
-    # ChangePassword() is called by the 'Change password' button. This function
-    #   sends the username, new password, and confirmed new password to the
-    #   ChangePassword() function in LogInLogic.py to update the user's
-    #   password
-    # Args:     none
-    # Returns:  none
     def ChangePassword(self):
-    
-        # Retrieve the username and passwords
-        username = self.username.get().rstrip()
-        password = self.new_pass.get().rstrip()
-        confirm  = self.conf_new.get().rstrip()
+        """Update a user's password using the user-provided information.
         
-        # 'result' is a boolean for successful password update and 'msg'
-        #   contains either a success message or error message
-        result, msg = LogInLogic.ChangePassword(username, password, confirm)
+        Returns:
+            'True' if the password is successfully changed.
+            'False' if any fields are left blank, the password fields don't
+                match, the new password is identical to the old password, or
+                the user isn't found in the database.
+        """
         
-        if result:
-            tk.messagebox.showinfo('Success', msg)
-            self.Return()
-        else:
-            tk.messagebox.showerror('Error', msg)
+        username = self.username.get().lstrip().rstrip()
+        if not username:
+            messagebox.showerror('Error', 'No username entered.')
+            return False
+        
+        if not self.PasswordMatch():
+            messagebox.showerror('Error', 'Password fields do not match.')
+            return False
+        password = self.password.get().lstrip().rstrip()
+        
+        for user in self.user_db:
+            if user['User'] == username:
+                if user['Password'] == password:
+                    messagebox.showerror('Error',
+                                         'New password unchanged from the ' \
+                                         'old password.')
+                    return False
+                user['Password'] = password
+                messagebox.showinfo('Success!', 'Password updated!')
+                return True
+        
+        messagebox.showerror('Error', f'{username} not found in database.')
+        return False
     
     
-    
-    # CheckLogin() is called by the 'Log In' button. It validates the user
-    #   credentials by passing them to the CheckLogin() function found in 
-    #   LoginLogic.py. If the credentials are correct, the Log In window is
-    #   destroyed and the Main Window is initialized.
-    # Args:     none
-    # Returns:  none
     def CheckLogin(self):
+        """Verify the user-provided credentials and retrieve last log-in date.
         
-        username = self.username.get().rstrip()
-        password = self.password.get().rstrip()
+        Returns:
+            'True', the username, and the date of the user's last login if the
+                provided information is valid.
+            'False', 'None', and 'None' if the username or password fields
+                aren't populated, the password is incorrect, or the user
+                wasn't found in the database.
+        """
         
-        # Validate the information. If 'check' is False, msg will contain an
-        #   error message
-        result, msg = LogInLogic.CheckLogin(username, password)
+        username = self.username.get().lstrip().rstrip()
+        if not username:
+            messagebox.showerror('Error', 'No username entered.')
+            return False, None, None
         
-        if result:
-            # Retrieve the most recent log-in date
-            login_date = LogInLogic.GetLastLogIn(username)
+        password = self.password.get().lstrip().rstrip()
+        if not password:
+            messagebox.showerror('Error', 'No password entered.')
+            return False, None, None
         
-            # Delete this window and load the main program
-            self.main_frame.forget()
-            MainWindow.MainWindow(self, username, login_date)
-        else:
-            tk.messagebox.showerror('Error', msg)
+        for user in self.user_db:
+            if user['User'] == username:
+                if user['Password'] == password:
+                    # Retrive the last log-in date, then update value to now
+                    prev_login = user['LastLogIn']
+                    user['LastLogIn'] = date.today().strftime('%B %d, %Y')
+                    return True, username, prev_login
+                else:
+                    messagebox.showerror('Error',
+                                         'The provided password is incorrect.')
+                    return False, None, None
+        
+        messagebox.showerror('Error', f'User {username} does not exist.')
+        return False, None, None
     
     
-    
-    # CreateAccount() is called by the 'Create New Account' button. It destroys
-    #   the log in widgets and creates the widgets used to create a new user
-    #   account
-    # Args:     none
-    # Returns:  none
     def CreateAccount(self):
-    
-        # Erase the initial log in widgets and load the account creation ones
-        self.main_canvas.delete(self.loginw)
+        """Add a new user account to the database list.
         
-        # Widgets are created from the bottom of the screen, which causes the
-        #   'Tab' button to traverse them in that order. This list helps
-        #   to reverse that and return 'Tab' to expected behavior
-        widget_list = []
+        Returns:
+            'True' if the user provided a valid username and the passwords
+                are identical.
+            'False' if no username was provided, no password was provided,
+                or the passwords don't match.
+        """
+        
+        username = self.username.get().lstrip().rstrip()
+        if not username:
+            messagebox.showerror('Error', 'No username entered!')
+            return False
+        for user in self.user_db:
+            if user['User'] == username:
+                messagebox.showerror('Error', f'{username} already exists!')
+                return False
+        
+        if not self.PasswordMatch():
+            messagebox.showerror('Error', 'Passwords must match!')
+            return False
+        password = self.password.get().lstrip().rstrip()
+        
+        user_data = {
+            'User': username,
+            'Password': password,
+            'CreationDate': date.today().strftime('%B %d, %Y'),
+            'LastLogIn': ''
+        }
+        self.user_db.append(user_data)
+        return True
+    
+    
+    def InitializeWindow(self):
+        """Initialize the main program window."""
+        
+        win_height = 600
+        win_width = 900
+        
+        # 'x' and 'y' coordinates place window in the center of the screen
+        y = int((self.winfo_screenheight() / 2) - (win_height / 2))
+        x = int((self.winfo_screenwidth() / 2) - (win_width / 2))
+        self.geometry(f'{win_width}x{win_height}+{x}+{y}')
+        self.resizable(False, False)
+        self.title('Log In')
+        
+        # Initialize the background template frame and canvas
+        self.main_frame = Widgets.CreateFrame(self)
+        self.main_frame.pack(fill='both', expand='true')
+        self.main_canvas = Widgets.CreateCanvas(self.main_frame)
+        self.main_canvas.pack(fill='both', expand='true')
+        
+        # Create a window in the center of the screen to hold widgets
+        top_left_x = win_width / 4
+        top_left_y = win_height / 4
+        bottom_right_x = win_width - top_left_x
+        bottom_right_y = win_height - top_left_y
+        self.main_canvas.create_rectangle(top_left_x, top_left_y,
+                                          bottom_right_x, bottom_right_y,
+                                          fill='#f8f8ff')
+        self.canvas_window = self.main_canvas.create_window(win_width / 2,
+                                                            win_height / 2)
+        
+        # Function to save user data if the window is exited
+        self.protocol('WM_DELETE_WINDOW', self.OnClose)
+    
+    
+    def LoadCreateAccountWindow(self):
+        """Initialize the widgets used to create a new user account.
+        
+        This function is called by the 'Create New Account' button on the
+            'Log In' window.
+        """
+        
+        def CreateAccount():
+            """Call the function to create a new account and log in.
+            
+            This function is called by the 'Create Account' button. If the
+                user provided a valid username and the password fields match,
+                the account will be created and the user will be asked to log
+                into the account. If the user declines, the window resets back
+                to the initial 'Log In' window.
+            """
+            
+            if not self.CreateAccount():
+                return
+            
+            # Offer to log the new user account in
+            ask = messagebox.askyesno('Success!',
+                                     f'Account created. Log in as {username}?')
+            if ask:
+                # Save data to the file and load the main program
+                self.SaveData()
+                self.main_frame.destroy()
+                MainWindow.MainWindow(self, username, login_date=None)
+            else:
+                # Clear variable fields and return to initial 'Log In' window
+                self.username.set('')
+                self.password.set('')
+                self.confirm_pass.set('')
+                Return()
+        
+        def Return():
+            """Erase 'Account Creation' widgets to load 'Log In' widgets.
+            
+            This function is called by the 'Return To Log In' button.
+            """
+            confirm_frame.forget()
+            self.LoadLogInWindow()
         
         confirm_frame = Widgets.CreateFrame(self.main_canvas)
-        self.acctw = self.main_canvas.create_window(self.WIN_WIDTH / 2,
-                                                    self.WIN_HEIGHT / 2,
-                                                    window = confirm_frame)
+        self.main_canvas.itemconfigure(self.canvas_window,
+                                       window=confirm_frame)
         
-        # Create a frame to hold the buttons
+        # Create a button to create the account and a button to return to
+        #   the 'Log In' window
         button_frame = Widgets.CreateFrame(confirm_frame)
-        button_frame.pack(side = 'bottom')
+        button_frame.pack(side='bottom')
         
-        # Create a button two finalize the account
-        finalize_button = Widgets.CreateButton(button_frame, 'Create Account',
-                                            self.FinalizeAccount,
-                                            self.BUT_HEIGHT)
-        finalize_button.pack(side = 'left')
+        create_button = Widgets.CreateButton(button_frame,
+                                             _text='Create Account',
+                                             _cmd=CreateAccount,
+                                             _height=self.button_height)
+        create_button.pack(side='left')
+        return_button = Widgets.CreateButton(button_frame,
+                                             _text='Return To\nLog In',
+                                             _cmd=Return,
+                                             _height=self.button_height)
+        return_button.pack(side='right')
         
-        # Create a button to return to the main screen
-        return_button = Widgets.CreateButton(button_frame, 'Return to\nLog In',
-                                          self.Return, self.BUT_HEIGHT)
-        return_button.pack(side = 'right')
-        
-        # Create a label to monitor whether the contents of both password
-        #   fields match or not
-        self.pass_match_label = Widgets.CreateLabel(confirm_frame, '',
-                                                    _font = ('georgia', 8))
-        self.pass_match_label.pack(side = 'bottom')
-        
-        # Set the two password fields to monitor their contents and call it
-        #   to initialize the label's text
+        # Set the password fields to monitor if they match and update a label
+        #   to show their status
+        self.pass_match_label = Widgets.CreateLabel(confirm_frame, _text='',
+                                                    _font=('georgia', 8))
+        self.pass_match_label.pack(side='bottom')
         self.password.trace('w', self.PasswordMatch)
         self.confirm_pass.trace('w', self.PasswordMatch)
         self.PasswordMatch()
         
-        # Create an entry box and label for password confirmation
-        self.confirm_entry = Widgets.CreateEntry(confirm_frame,
-                                                 self.confirm_pass, '*')
-        self.confirm_entry.pack(side = 'bottom')
-        widget_list.append(self.confirm_entry)
-        
-        confirm_label = Widgets.CreateLabel(confirm_frame, 'Confirm Password:')
-        confirm_label.pack(side = 'bottom')
-        
-        # Create an entry box and label for the password
-        self.pass_entry = Widgets.CreateEntry(confirm_frame, self.password, 
-                                              '*')
-        self.pass_entry.pack(side = 'bottom')
-        widget_list.append(self.pass_entry)
-        
-        pass_label = Widgets.CreateLabel(confirm_frame, 'Password:')
-        pass_label.pack(side = 'bottom')
-        
-        # Create an entry box and label for the username
-        self.user_entry = Widgets.CreateEntry(confirm_frame, self.username)
-        self.user_entry.pack(side = 'bottom')
-        widget_list.append(self.user_entry)
-        
-        user_label = Widgets.CreateLabel(confirm_frame, 'Username:')
-        user_label.pack(side = 'bottom')
-        
-        # Reverse the 'Tab' navigation
-        widget_list.reverse()
-        for widget in widget_list:
-            widget.lift()
-    
-    
-    
-    # CreateBackground() initializes a frame and canvas that cover the entire
-    #   window and places a white box in the middle of the window
-    # Args:     none
-    # Returns:  none
-    def CreateBackground(self):
-    
-        # Create the frame and canvas
-        self.main_frame = Widgets.CreateFrame(self)
-        self.main_frame.pack(fill = 'both', expand = 'true')
-        
-        self.main_canvas = Widgets.CreateCanvas(self.main_frame)
-        self.main_canvas.pack(fill = 'both', expand = 'true')
-        
-        # Draw a rectangle in the middle of the window
-        top_left_x = self.WIN_WIDTH / 4
-        top_left_y = self.WIN_HEIGHT / 4
-        bottom_right_x = self.WIN_WIDTH - top_left_x
-        bottom_right_y = self.WIN_HEIGHT - top_left_y
-        self.main_canvas.create_rectangle(top_left_x, top_left_y,
-                                          bottom_right_x, bottom_right_y,
-                                          fill = self.WHITE)
-    
-    
-    
-    # CreateLogInFields() initializes the widgets used to log in
-    # Args:     none
-    # Returns:  none
-    def CreateLogInFields(self):
-    
-        # Widgets are created from the bottom of the screen, which causes the
-        #   'Tab' button to traverse them in that order. This list helps
-        #   to reverse that and return 'Tab' to expected behavior
+        # Create the 'Confirm Password', 'Password', and 'Username' fields
         widget_list = []
-    
-        # Create a frame within the canvas to hold the widgets
-        self.login_frame = Widgets.CreateFrame(self.main_canvas)
-        self.loginw = self.main_canvas.create_window(self.WIN_WIDTH / 2,
-                                                     self.WIN_HEIGHT / 2,
-                                                     window = self.login_frame)
+        confirm_entry = Widgets.CreateEntry(confirm_frame,
+                                            _var=self.confirm_pass, _show='*')
+        confirm_entry.pack(side='bottom')
+        widget_list.append(confirm_entry)
+        confirm_label = Widgets.CreateLabel(confirm_frame,
+                                            _text='Confirm Password:')
+        confirm_label.pack(side='bottom')
         
-        # Create a frame to hold buttons
-        button_frame = Widgets.CreateFrame(self.login_frame)
-        button_frame.pack(side = 'bottom')
-        
-        # Create a button to log in
-        login_button = Widgets.CreateButton(button_frame, 'Log In',
-                                            self.CheckLogin, self.BUT_HEIGHT)
-        login_button.pack(side = 'left')
-        
-        # Create a button to make a new user account
-        create_button = Widgets.CreateButton(button_frame,
-                                             'Create\nNew Account',
-                                             self.CreateAccount,
-                                             self.BUT_HEIGHT)
-        create_button.pack(side = 'right')
-        
-        # Create a clickable label to reset a password
-        reset_label = Widgets.CreateLabel(self.login_frame, 'Forgot Password?',
-                                         _font = ('georgia', 10))
-        reset_label.pack(side = 'bottom')
-        
-        # Bind a mouse-click event to the 'Forgot password?' label
-        reset_label.bind('<Button-1>', lambda e:self.ForgotPassword())
-        
-        # Create an entry box and label for the password
-        pass_entry = Widgets.CreateEntry(self.login_frame, self.password, '*')
-        pass_entry.pack(side = 'bottom')
+        pass_entry = Widgets.CreateEntry(confirm_frame,
+                                         _var=self.password, _show='*')
+        pass_entry.pack(side='bottom')
         widget_list.append(pass_entry)
+        pass_label = Widgets.CreateLabel(confirm_frame, _text='Password:')
+        pass_label.pack(side='bottom')
         
-        pass_label = Widgets.CreateLabel(self.login_frame, 'Password:')
-        pass_label.pack(side = 'bottom')
-        
-        # Create an entry box and label for the username
-        user_entry = Widgets.CreateEntry(self.login_frame, self.username)
-        user_entry.pack(side = 'bottom')
+        user_entry = Widgets.CreateEntry(confirm_frame, _var=self.username)
+        user_entry.pack(side='bottom')
         widget_list.append(user_entry)
+        user_label = Widgets.CreateLabel(confirm_frame, _text='Username:')
+        user_label.pack(side='bottom')
         
-        user_label = Widgets.CreateLabel(self.login_frame, 'Username:')
-        user_label.pack(side = 'bottom')
-        
-        # Reverse the 'Tab' navigation
+        # Entry fields are created bottom-to-top and their order in the window
+        #   stack needs to be reversed and lifted so that 'Tab' navigates from
+        #   top-to-bottom
         widget_list.reverse()
         for widget in widget_list:
             widget.lift()
     
     
-    
-    # CreateWindow() initializes the window
-    # Args:     none
-    # Returns:  none
-    def CreateWindow(self):
-    
-        # Obtain x&y coordinates to place window in center of screen
-        y_pos = int((self.winfo_screenheight() / 2) - (self.WIN_HEIGHT / 2))
-        x_pos = int((self.winfo_screenwidth() / 2) - (self.WIN_WIDTH / 2))
+    def LoadDatabase(self):
+        """Load the user accounts information from the database file.
         
-        # Title and size the main window
-        self.title('Log In')
-        self.geometry(f'{self.WIN_WIDTH}x{self.WIN_HEIGHT}+{x_pos}+{y_pos}')
-        self.resizable(False, False)
+        This function opens the file containing user account information and
+            loads the contents into a list. In the event that a new user is
+            created or a user's password is updated, the information will be
+            saved back to the database either before the main program launches
+            or before the window is closed.
         
-        self.CreateBackground()
-        self.CreateLogInFields()
+        Returns:
+            db_data: If the user accounts file exists and is accessible, this
+                        list contains the contents
+                     If the file doesn't exist or is inaccessible, this list
+                        is empty
+        """
+        
+        db_data = []
+        try:
+            with open(self.users_file, 'r') as infile:
+                db_data = json.load(infile)
+        except IOError:
+            # The database file is nonexistent or corrupt and should be
+            #   created as a fresh file
+            try:
+                with open(self.users_file, 'x') as infile:
+                    pass
+            except:
+                messagebox.showerror('Error', 'File creation operations not ' \
+                                              'allowed in the current ' \
+                                              'directory.\n User account ' \
+                                              'information will not be saved.')
+        except JSONDecodeError:
+            messagebox.showerror('Error',
+                                 f'Unable to load data from {self.users_file}')
+        except:
+            messagebox.showerror('Error', 'Unexpected error encountered.')
+        
+        return db_data
     
     
-    
-    # FinalizeAccount() is called by the 'Create Account' button. This function
-    #   collects the username and password fields and passes them to the
-    #   CreateAccount() function in LogInLogic.py to add the new account to the
-    #   users database
-    # Args:     none
-    # Returns:  none
-    def FinalizeAccount(self):
-    
-        username = self.username.get().rstrip()
-        password = self.password.get().rstrip()
+    def LoadForgotPasswordWindow(self):
+        """Initialize the widgets used to change a user's password.
         
-        # Ensure the username field is populated
-        if not username:
-            tk.messagebox.showerror('ERROR', 'No username entered.')
-            return
+        This function is called by clicking on the 'Forgot Password?' label
+            located on the 'Log In' window.
+        """
         
-        # Ensure the password fields match
-        if not self.PasswordMatch():
-            tk.messagebox.showerror('ERROR', 'Passwords must match.')
-            return
-        
-        result, msg = LogInLogic.CreateAccount(username, password)
-        if result:
-        
-            # Prompt the user to log in as the new account
-            load_txt = 'Account successfully created. Log in as ' \
-                       f'{username} now?'
-            load = tk.messagebox.askyesno('Success', load_txt)
+        def ChangePassword():
+            """Call the function to change the user's password.
             
-            if load:
-                # Destroy the main frame to erase the current window
-                self.main_frame.destroy()
-            
-                # MainWindow() takes a last log-in date as an argument. Since
-                #   this is a new account, pass 'None' instead
-                MainWindow.MainWindow(self, username, None)
+            This function is called by the 'Change Password' button.
+            """
+            if self.ChangePassword():
+                # Update successful, return to main screen
+                self.confirm_pass.set('')
+                self.password.set('')
+                Return()
             else:
-                # If a user created a new account but didn't want to log in as
-                #   that account, clear the username and password fields
-                self.user_entry.delete(0, 'end')
-                self.pass_entry.delete(0, 'end')
-                self.confirm_entry.delete(0, 'end')
-                self.Return()
-        else:
-            tk.messagebox.showerror('Error', msg)
-    
-    
-    
-    # ForgotPassword() is called by the 'Forgot password?' label. It destroys
-    #   the main log in widgets and rebuilds the window with fields used to
-    #   change a user's password
-    # Args:     none
-    # Returns:  none
-    def ForgotPassword(self):
-    
-        # Update the window flag
-        self.forgot_flag = True
-    
-        self.new_pass = tk.StringVar()      # Stores 'New password' field
-        self.conf_new = tk.StringVar()      # Stores 'Confirm password' field
+                return
         
-        # Delete the log in widgets
-        self.main_canvas.delete(self.loginw)
-        
-        # Widgets are created from the bottom of the screen, which causes the
-        #   'Tab' button to traverse them in that order. This list helps
-        #   to reverse that and return 'Tab' to expected behavior
-        widget_list = []
+        def Return():
+            """Erase 'Forgot Password' widgets to load 'Log In' widgets.
+            
+            This function is called by the 'Return To Log In' button.
+            """
+            forgot_frame.forget()
+            self.LoadLogInWindow()
         
         forgot_frame = Widgets.CreateFrame(self.main_canvas)
-        self.forgotw = self.main_canvas.create_window(self.WIN_WIDTH / 2,
-                                                      self.WIN_HEIGHT / 2,
-                                                      window = forgot_frame)
+        self.main_canvas.itemconfigure(self.canvas_window, window=forgot_frame)
         
-        # Create a frame to hold the buttons
+        # Create a button to change the password and a button to return to
+        #   the initial 'Log In' window
         button_frame = Widgets.CreateFrame(forgot_frame)
-        button_frame.pack(side = 'bottom')
+        button_frame.pack(side='bottom')
         
-        # Create a button to change the password
-        change_button = Widgets.CreateButton(button_frame, 'Change password',
-                                             self.ChangePassword,
-                                             self.BUT_HEIGHT)
-        change_button.pack(side = 'left')
+        change_button = Widgets.CreateButton(button_frame,
+                                             _text='Change Password',
+                                             _cmd=ChangePassword,
+                                             _height=self.button_height)
+        change_button.pack(side='left')
+        return_button = Widgets.CreateButton(button_frame,
+                                             _text='Return To\nLog In',
+                                             _cmd=Return,
+                                             _height=self.button_height)
+        return_button.pack(side='right')
         
-        # Create a button to return to the main screen
-        return_button = Widgets.CreateButton(button_frame, 'Return to\nLog In',
-                                             self.Return, self.BUT_HEIGHT)
-        return_button.pack(side = 'right')
+        # Set the password fields to monitor if they match and update a label
+        #   to show their status
+        self.pass_match_label = Widgets.CreateLabel(forgot_frame, _text='',
+                                                    _font=('georgia', 8))
+        self.pass_match_label.pack(side='bottom')
+        self.password.trace('w', self.PasswordMatch)
+        self.confirm_pass.trace('w', self.PasswordMatch)
+        self.PasswordMatch()
         
-        # Create a password confirmation entry box and label
-        confirm_entry = Widgets.CreateEntry(forgot_frame, self.conf_new, '*')
-        confirm_entry.pack(side = 'bottom')
+        # Create the 'Confirm Password', 'New Password', and 'Username' fields
+        widget_list = []
+        confirm_entry = Widgets.CreateEntry(forgot_frame,
+                                            _var=self.confirm_pass,
+                                            _show='*')
+        confirm_entry.pack(side='bottom')
         widget_list.append(confirm_entry)
+        confirm_label = Widgets.CreateLabel(forgot_frame,
+                                            _text='Confirm Password:')
+        confirm_label.pack(side='bottom')
         
-        confirm_label = Widgets.CreateLabel(forgot_frame, 'Confirm password:')
-        confirm_label.pack(side = 'bottom')
-        
-        # Create a new password entry box and label
-        new_pass_entry = Widgets.CreateEntry(forgot_frame, self.new_pass, '*')
-        new_pass_entry.pack(side = 'bottom')
+        new_pass_entry = Widgets.CreateEntry(forgot_frame, _var=self.password,
+                                             _show='*')
+        new_pass_entry.pack(side='bottom')
         widget_list.append(new_pass_entry)
+        new_pass_label = Widgets.CreateLabel(forgot_frame,
+                                             _text='New Password:')
+        new_pass_label.pack(side='bottom')
         
-        new_pass_label = Widgets.CreateLabel(forgot_frame, 'New password:')
-        new_pass_label.pack(side = 'bottom')
-        
-        # Create a username entry box and label
-        user_entry = Widgets.CreateEntry(forgot_frame, self.username)
-        user_entry.pack(side = 'bottom')
+        user_entry = Widgets.CreateEntry(forgot_frame, _var=self.username)
+        user_entry.pack(side='bottom')
         widget_list.append(user_entry)
+        user_label = Widgets.CreateLabel(forgot_frame, _text='Username:')
+        user_label.pack(side='bottom')
         
-        user_label = Widgets.CreateLabel(forgot_frame, 'Username:')
-        user_label.pack(side = 'bottom')
-        
-        # Reverse the 'Tab' navigation
+        # Entry fields are created bottom-to-top and their order in the window
+        #   stack needs to be reversed and lifted so that 'Tab' navigates from
+        #   top-to-bottom
         widget_list.reverse()
         for widget in widget_list:
             widget.lift()
     
     
-    
-    # PasswordMatch()'s primary function is to constantly monitor the
-    #   'Password' and 'Confirm Password' fields and provide a visual indicator
-    #   of whether the two fields have identical contents or not
-    # Return values are only utilized when creating a new user account
-    # Args:     none
-    # Returns:  True if the passwords match
-    #           False if they don't
-    def PasswordMatch(self, *args):
-    
-        pass1 = self.password.get().rstrip()
-        pass2 = self.confirm_pass.get().rstrip()
+    def LoadLogInWindow(self):
+        """Initialize the widgets used to log in to an account."""
         
-        # Update a label, located above the 'Confirm Password' box, to inform
-        #   the user of the status of the two fields
+        def CreateAccount():
+            """Erase 'Log In' widgets to load 'Account Creation' widgets.
+            
+            This function is called by the 'Create New Account' button.
+            """
+            login_frame.forget()
+            self.LoadCreateAccountWindow()
+        
+        def ForgotPassword():
+            """Erase 'Log In' widgets to load 'Forgot Password' widgets.
+            
+            This function is called by clicking on the 'Forgot Password' label.
+            """
+            login_frame.forget()
+            self.LoadForgotPasswordWindow()
+        
+        def LogIn():
+            """Verify the user's credentials and load the main program.
+            
+            This function is called by the  'Log In' button.
+            """
+            result, user, date = self.CheckLogin()
+            if result:
+                # Save the database file and load the program
+                self.SaveData()
+                self.main_frame.destroy()
+                MainWindow.MainWindow(self, user, login_date=date)
+        
+        login_frame = Widgets.CreateFrame(self.main_canvas)
+        self.main_canvas.itemconfigure(self.canvas_window, window=login_frame)
+        
+        # Create a button to log in and a button to create a new account
+        button_frame = Widgets.CreateFrame(login_frame)
+        button_frame.pack(side='bottom')
+        login_button = Widgets.CreateButton(button_frame,
+                                            _text='Log In',
+                                            _cmd=LogIn,
+                                            _height=self.button_height)
+        login_button.pack(side='left')
+        create_button = Widgets.CreateButton(button_frame,
+                                             _text='Create\nNew Account',
+                                             _cmd=CreateAccount,
+                                             _height=self.button_height)
+        create_button.pack(side='right')
+        
+        # Create a clickable label to reset a user's password
+        reset_label = Widgets.CreateLabel(login_frame,
+                                          _text='Forgot Password?',
+                                          _font=('georgia', 10))
+        reset_label.pack(side='bottom')
+        reset_label.bind('<Button-1>', lambda e:ForgotPassword())
+        
+        # Create the 'Password' and 'Username' fields
+        widget_list = []
+        pass_entry = Widgets.CreateEntry(login_frame, _var=self.password,
+                                         _show='*')
+        pass_entry.pack(side='bottom')
+        widget_list.append(pass_entry)
+        pass_label = Widgets.CreateLabel(login_frame, _text='Password:')
+        pass_label.pack(side='bottom')
+        
+        user_entry = Widgets.CreateEntry(login_frame, _var=self.username)
+        user_entry.pack(side='bottom')
+        widget_list.append(user_entry)
+        user_label = Widgets.CreateLabel(login_frame, _text='Username:')
+        user_label.pack(side='bottom')
+        
+        # Entry fields are created bottom-to-top and their order in the window
+        #   stack needs to be reversed and lifted so that 'Tab' navigates from
+        #   top-to-bottom
+        widget_list.reverse()
+        for widget in widget_list:
+            widget.lift()
+    
+    
+    def OnClose(self):
+        """Save user account data before exiting the program."""
+        self.SaveData()
+        self.destroy()
+    
+    
+    def PasswordMatch(self, *args):
+        """Verify that the 'Password' and 'Confirm Password' fields match.
+        
+        This function is called whenever the contents of either of the password
+            entry fields changes. It updates the text on a label to reflect
+            the matching status to the user.
+        
+        Returns:
+        'True' if the fields contain identical contents.
+        'False' if they don't.
+        """
+        pass1 = self.password.get().lstrip().rstrip()
+        pass2 = self.confirm_pass.get().lstrip().rstrip()
+        
         if (pass1 and pass1 == pass2):
-            self.pass_match_label['text'] = 'Passwords match!'
+            self.pass_match_label['text'] = 'Passwords match'
             self.pass_match_label['fg'] = 'green'
             return True
         else:
@@ -436,22 +513,14 @@ class LogInWindow(Tk):
             return False
     
     
-    
-    # Return() is called by the 'Return to Log In' button present on both the
-    #   account creation and change of password windows. This function deletes
-    #   the widgets used by either of those two windows and loads the initial
-    #   log in widgets
-    # Args:     none
-    # Returns:  none
-    def Return(self):
-    
-        # If the forgot flag is True, that window called the function and those
-        #   widgets should be deleted. If not, then the account creation window
-        #   called the function
-        if self.forgot_flag:
-            self.main_canvas.delete(self.forgotw)
-            self.forgot_flag = False
-        else:
-            self.main_canvas.delete(self.acctw)
+    def SaveData(self):
+        """Save user account information to the database file."""
         
-        self.CreateLogInFields()
+        try:
+            with open(self.users_file, 'r+') as outfile:
+                json.dump(self.user_db, outfile, indent=4)
+                outfile.truncate()
+        except:
+            messagebox.showerror('Error',
+                                 f'{self.users_file} could not be accessed.' \
+                                 'New user information won\'t be saved')
